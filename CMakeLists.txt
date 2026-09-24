@@ -72,17 +72,21 @@ endif()
 # inkstand_core is state/ and persist/: the store, the actions and effects, the typed cache and
 # the journals. It links inkwell and nothing else, so a program with nothing to draw uses it
 # without a toolkit in its link line. inkstand is the rest - nav/, form/, app/ - and adds inkcell.
-#
-# inkstand_core is an INTERFACE target while state/ and persist/ have no source to compile: an
-# add_library(STATIC) with no sources is a configure error. The first file to land in one of
-# those areas turns it STATIC, as inkstand below already is. Consumers link the aliases and never
-# notice the change.
-add_library(inkstand_core INTERFACE)
-target_include_directories(inkstand_core INTERFACE
+add_library(inkstand_core STATIC
+    # persist/ - the records an application keeps on disk
+    src/persist/fields.c
+    src/persist/keys.c
+)
+target_include_directories(inkstand_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(inkstand_core INTERFACE inkwell::inkwell)
+# PUBLIC: a header hands out inkwell's printf archetype, and an application that writes a record
+# file reads it back with inkwell's record_file.h.
+target_link_libraries(inkstand_core
+    PUBLIC inkwell::inkwell
+    PRIVATE inkstand_options
+)
 add_library(inkstand::core ALIAS inkstand_core)
 
 if(INKSTAND_WITH_UI)
