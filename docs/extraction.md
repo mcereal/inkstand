@@ -25,17 +25,22 @@ inkwell's three questions, in its order:
 Easiest and most useful first; most entangled last. Line counts are mesh-client's, at the time
 this page was written.
 
-### 1. The controller and the frame scheduler
+### 1. The frame scheduler - done
 
-`src/ui/nav/controller.c` (435 lines) drains the store into a snapshot, hands it to a backend's
-`present()`, and arms a ~33 ms frame timer only while the backend says something is still
-moving - so a screen sitting still costs no wake-ups. None of that is Meshtastic.
+**Moved:** `include/inkstand/nav/frame_scheduler.h` and `src/nav/frame_scheduler.c`, from the
+presenting half of mesh-client's `src/ui/nav/controller.c`. It watches a store's wake, drains
+into a snapshot the application owns, presents it, and arms a frame timer only while the backend
+says something is still moving - so a screen sitting still costs no wake-ups. The seam turned out
+to be what this page guessed: a descriptor, a drain callback and a snapshot pointer, plus an
+optional "nothing changed" hook for the timer's frames and a "publish once" hook for the first
+frame. The frame interval is the application's, passed in. Its cases came with it as
+`tests/suites/nav_frame_scheduler.c`.
 
-What it names across the line: `mesh/ui/store.h` (the snapshot type), `mesh/ui/nav.h`,
-`mesh/ui/focus.h` and `mesh/ui/commands.h`. The seam is the snapshot: the controller copies and
-presents one without reading it, so it needs a size and a drain callback, not the type.
-
-**Stays behind:** the snapshot's contents, and the action handler's body.
+**Stayed behind:** the controller itself. Since this page was first written it had grown a
+command dispatcher, clicks, a context menu and desktop shortcuts, all resolved against
+mesh-client's snapshot and its command table - so the half that decides what a press *means* is
+the application's, and it now stands on the scheduler rather than beside it. It comes down when
+step 7 gives a screen its own `on_key`, not before.
 
 ### 2. The control socket and the scene runner
 
@@ -44,9 +49,10 @@ keys by name, wait, and bring back a frame as a picture - what mesh-client's `ma
 stands on. `devtools/ui_capture/` (about 3,200 lines) drives the same presses through a script
 and renders every frame off-screen. Every application on this stack wants both, on day one.
 
-What it names across the line: `mesh/ui/controller.h` (step 1 removes that) and
-`mesh/ui/route.h`, for the `screen` command's answer. The seam is a callback returning the
-current screen's ASCII id - which the screen stack in step 7 answers for free.
+What it names across the line: `mesh/ui/controller.h` and `mesh/ui/route.h`. After step 1 the
+first is two questions the scheduler answers - `settled()` and `frame()` - and one it cannot,
+pressing a key, which is a callback. The second is a callback returning the current screen's
+ASCII id - which the screen stack in step 7 answers for free.
 
 **Stays behind:** mesh-client's scenes, and the socket path and environment variable names.
 
