@@ -1,5 +1,4 @@
-#ifndef UICAP_SCENE_H
-#define UICAP_SCENE_H
+#pragma once
 
 /*
  * The scene runner: a script of presses, played against an off-screen panel on a clock the script
@@ -26,11 +25,15 @@
  *   hold MS           lengthen the frame just emitted, and move the clock with it
  *
  * Every other verb is the application's, and by default emits one frame and plays out whatever
- * that frame left moving - the rule the scripts were written to, now kept by the runner rather
- * than by each verb remembering to.
+ * that frame left moving. The runner keeps that rule rather than each verb: when every verb had
+ * to remember it, a quarter of them forgot, and a script's `hold` froze an animation on its
+ * first frame.
  *
- * Nothing here exits. A verb that refuses returns uicap_scene_fail(), the runner keeps the line it
- * was on, and the caller decides what a bad script costs - which is what lets a scene run
+ * The verb table is the half of this header not yet proven general: one application has written
+ * rows for it. It is marked unstable until a second one does - see docs/extraction.md.
+ *
+ * Nothing here exits. A verb that refuses returns inkstand_scene_fail(), the runner keeps the line
+ * it was on, and the caller decides what a bad script costs - which is what lets a scene run
  * in-process under a test as well as behind a command-line tool.
  */
 
@@ -42,29 +45,33 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct inkcell_capture;
-struct uicap_scene;
+struct inkstand_scene;
 
 /* Must come before the first frame; refused after it. The runner does not start the scene for
    one. */
-#define UICAP_SCENE_SETUP 0x1U
+#define INKSTAND_SCENE_SETUP 0x1U
 /* Emits its own frames, or none: the runner neither emits nor settles after it. */
-#define UICAP_SCENE_NO_FRAME 0x2U
+#define INKSTAND_SCENE_NO_FRAME 0x2U
 
 /*
  * One of the application's verbs. `args` is the rest of the line, writable, for
- * uicap_scene_word() to split. Returns 0, or uicap_scene_fail().
+ * inkstand_scene_word() to split. Returns 0, or inkstand_scene_fail().
  */
-struct uicap_scene_verb {
+struct inkstand_scene_verb {
     const char *name;
     unsigned flags;
-    int (*run)(struct uicap_scene *scene, char *args, void *userdata);
+    int (*run)(struct inkstand_scene *scene, char *args, void *userdata);
 };
 
 /* A named starting state - `scene NAME`. The first row is the default. */
-struct uicap_scene_seed {
+struct inkstand_scene_seed {
     const char *name;
-    int (*seed)(struct uicap_scene *scene, void *userdata);
+    int (*seed)(struct inkstand_scene *scene, void *userdata);
 };
 
 /*
@@ -79,7 +86,7 @@ struct uicap_scene_seed {
  *
  * `capture`, `snapshot`, `drain` and `press` are required; the rest may be NULL.
  */
-struct uicap_scene_host {
+struct inkstand_scene_host {
     struct inkcell_capture *capture;
     void *snapshot;
     inkstand_frame_drain_fn drain;
@@ -88,9 +95,9 @@ struct uicap_scene_host {
     void (*tick)(void *userdata, uint64_t now_ms);
     const char *(*screen)(void *userdata);
     void (*themed)(void *userdata);
-    const struct uicap_scene_seed *seeds;
+    const struct inkstand_scene_seed *seeds;
     size_t seed_count;
-    const struct uicap_scene_verb *verbs;
+    const struct inkstand_scene_verb *verbs;
     size_t verb_count;
     void *userdata;
 };
@@ -101,7 +108,7 @@ struct uicap_scene_host {
  * script ends: `hold` lengthens the frame already emitted, so its delay is not known when it is.
  * Frames are numbered from 0, and each `delay` arrives in order. Either may be NULL.
  */
-struct uicap_scene_sink {
+struct inkstand_scene_sink {
     int (*frame)(void *userdata, unsigned index, const struct inkcell_capture *capture);
     int (*delay)(void *userdata, unsigned index, unsigned delay_ms);
     void *userdata;
@@ -113,7 +120,7 @@ struct uicap_scene_sink {
  * takes the default beside each - except `delay_ms`, where zero is a delay somebody may mean,
  * and is kept.
  */
-struct uicap_scene_config {
+struct inkstand_scene_config {
     unsigned frame_ms;      /* 33: the interval a still-moving frame carries */
     unsigned delay_ms;      /* no default: 0 is a zero delay */
     unsigned settle_frames; /* 40 */
@@ -122,15 +129,15 @@ struct uicap_scene_config {
     const char *theme;      /* NULL: whatever the capture opened with */
 };
 
-#define UICAP_SCENE_NAME_MAX 32U
-#define UICAP_SCENE_ERROR_MAX 256U
+#define INKSTAND_SCENE_NAME_MAX 32U
+#define INKSTAND_SCENE_ERROR_MAX 256U
 
-struct uicap_scene {
-    struct uicap_scene_host host;
-    struct uicap_scene_sink sink;
-    struct uicap_scene_config config;
-    char seed[UICAP_SCENE_NAME_MAX];
-    char theme[UICAP_SCENE_NAME_MAX];
+struct inkstand_scene {
+    struct inkstand_scene_host host;
+    struct inkstand_scene_sink sink;
+    struct inkstand_scene_config config;
+    char seed[INKSTAND_SCENE_NAME_MAX];
+    char theme[INKSTAND_SCENE_NAME_MAX];
     bool started;
     bool finished;
     uint64_t now_ms;
@@ -138,52 +145,56 @@ struct uicap_scene {
     /* The delay of the last frame emitted, which a `hold` may still lengthen. */
     unsigned pending_delay_ms;
     unsigned line;
-    char error[UICAP_SCENE_ERROR_MAX];
+    char error[INKSTAND_SCENE_ERROR_MAX];
 };
 
 /* Returns 0, or -EINVAL for a host missing something required, or a verb table naming one verb
    twice or naming one of the runner's own - a row whose name is already taken is one no script
    can ever reach. */
-int uicap_scene_init(struct uicap_scene *scene, const struct uicap_scene_host *host,
-                     const struct uicap_scene_sink *sink, const struct uicap_scene_config *config);
+int inkstand_scene_init(struct inkstand_scene *scene, const struct inkstand_scene_host *host,
+                        const struct inkstand_scene_sink *sink,
+                        const struct inkstand_scene_config *config);
 
 /* Runs one line. '#' starts a comment. Returns 0 or a negative errno, with the reason in
-   uicap_scene_error(). */
-int uicap_scene_run_line(struct uicap_scene *scene, char *line);
+   inkstand_scene_error(). */
+int inkstand_scene_run_line(struct inkstand_scene *scene, char *line);
 /* Every line of `file`, stopping at the first that fails. */
-int uicap_scene_run_file(struct uicap_scene *scene, FILE *file);
+int inkstand_scene_run_file(struct inkstand_scene *scene, FILE *file);
 /* Starts the scene if nothing has - a script that only set up still owes one frame - and hands
    the last frame's delay to the sink. */
-int uicap_scene_finish(struct uicap_scene *scene);
+int inkstand_scene_finish(struct inkstand_scene *scene);
 
 /* Why the last call failed, and on which line (1-based; 0 before any). */
-const char *uicap_scene_error(const struct uicap_scene *scene);
-unsigned uicap_scene_error_line(const struct uicap_scene *scene);
+const char *inkstand_scene_error(const struct inkstand_scene *scene);
+unsigned inkstand_scene_error_line(const struct inkstand_scene *scene);
 
 /* ---- for a verb ---------------------------------------------------------------------------- */
 
-/* Records the reason and returns -EINVAL, so a verb can `return uicap_scene_fail(...)`. */
-int uicap_scene_fail(struct uicap_scene *scene, const char *format, ...)
+/* Records the reason and returns -EINVAL, so a verb can `return inkstand_scene_fail(...)`. */
+int inkstand_scene_fail(struct inkstand_scene *scene, const char *format, ...)
     __attribute__((format(printf, 2, 3)));
 
 /* Splits off the next whitespace-delimited word, leaving *rest on what follows. NULL at the end. */
-char *uicap_scene_word(char **rest);
+char *inkstand_scene_word(char **rest);
 /* The rest of the line, less leading whitespace. */
-char *uicap_scene_tail(char *rest);
+char *inkstand_scene_tail(char *rest);
 /* A number, bounded as a typo guard rather than a claim about what renders. */
-int uicap_scene_number(struct uicap_scene *scene, const char *text, const char *what,
-                       unsigned *out);
-int uicap_scene_signed(struct uicap_scene *scene, const char *text, const char *what, int *out);
+int inkstand_scene_number(struct inkstand_scene *scene, const char *text, const char *what,
+                          unsigned *out);
+int inkstand_scene_signed(struct inkstand_scene *scene, const char *text, const char *what,
+                          int *out);
 
 /* Draws the current state as the next frame. */
-int uicap_scene_emit(struct uicap_scene *scene);
+int inkstand_scene_emit(struct inkstand_scene *scene);
 /* Steps the clock and draws until the last frame has stopped moving, or the settle cap. */
-int uicap_scene_settle(struct uicap_scene *scene);
+int inkstand_scene_settle(struct inkstand_scene *scene);
 /* A press, the frame it produces, and whatever it set moving. */
-int uicap_scene_press(struct uicap_scene *scene, enum inkcell_key key);
+int inkstand_scene_press(struct inkstand_scene *scene, enum inkcell_key key);
 
-uint64_t uicap_scene_now(const struct uicap_scene *scene);
-struct inkcell_capture *uicap_scene_capture(const struct uicap_scene *scene);
-bool uicap_scene_started(const struct uicap_scene *scene);
+uint64_t inkstand_scene_now(const struct inkstand_scene *scene);
+struct inkcell_capture *inkstand_scene_capture(const struct inkstand_scene *scene);
+bool inkstand_scene_started(const struct inkstand_scene *scene);
 
-#endif /* UICAP_SCENE_H */
+#ifdef __cplusplus
+}
+#endif
