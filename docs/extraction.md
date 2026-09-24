@@ -60,7 +60,7 @@ second suite needed it.
 **Stayed behind:** the flag and environment variable that name the socket, the scripts that
 clear a stale one, and the test that the default config opens none - all mesh-client's.
 
-### 2b. The scene runner - designed, in progress
+### 2b. The scene runner - done
 
 `devtools/ui_capture/main.c` (3,184 lines) drives presses through a script and renders every
 frame off-screen. It is the control socket's offline twin: the same press and the same screen
@@ -127,8 +127,8 @@ scenes in-process over the fake host in `tests/support/`, and an `expect screen 
 3. *Done.* Its cases, written here as `tests/suites/app_scene.c`, over a counter for a host and
    an `inkcell_fb_app` that says how long it is still moving. `main.c` had none of its own -
    mesh-client's `ui_capture` suite tests inkcell's capture, not the script.
-4. mesh-client's half, switching `devtools/ui_capture/main.c` to this runner and deleting its
-   copy.
+4. *Done, mesh-client 8b5ff3c.* mesh-client's half: `devtools/ui_capture/main.c` plays its
+   scenes on this runner and its copy is deleted.
 
 **Stays behind:** every fixture verb, the invented radio, mesh-client's scenes,
 `scripts/ui-capture.sh` and `frames.py`. So do `tab` and `context` for now - both need
@@ -136,7 +136,7 @@ mesh-client's screen order and focus ids, and `tab` needs to know that the shoul
 next tab" - until step 7 gives this side a screen list. `toast` stays until step 5 brings the
 overlays down.
 
-### 3. Persistence
+### 3. Persistence - in progress
 
 | File | Lines | What comes | What stays |
 |---|---|---|---|
@@ -151,6 +151,31 @@ archive and the trends log each built a journal separately; they become one.
 
 What they name across the line: `mesh/utils/file.h`, `mesh/ui/nav.h` (the archive routes by
 conversation) and each other's key tables.
+
+**3a. The field reader and the key table - done.** The two leaves the rest stand on.
+
+- **Moved:** `include/inkstand/persist/fields.h` and `src/persist/fields.c`, from mesh-client's
+  `store_fields.c` as it was - it named nothing of the application, so it needed no seam. And
+  `include/inkstand/persist/keys.h` and `src/persist/keys.c`, from the half of `store_keys.c`
+  that does what any key table does: the brackets a key carries, the exact lookup that refuses a
+  malformed one, and the writers with their escape. The seam was made in mesh-client first
+  (`store_key_table.{c,h}`): a row is a spelling, its `sizeof` length and its kind, a key is an
+  index into a table the caller hands in with 0 reserved for `NONE`, and the formatted writers
+  take a `va_list` so the application's printf-like wrapper forwards to them. They are
+  `persist/`'s first sources, so `inkstand_core` is a STATIC library now.
+- **Tests:** mesh-client's three value cases came as `tests/suites/persist_fields.c`, and its
+  key-lookup case as `tests/suites/persist_keys.c`, over a table of the suite's own with the same
+  hazards - one name that is a count and its rows, names that prefix each other. The writers'
+  cases are new; mesh-client held them only through a whole cache's round trip, which stays
+  there.
+- **Stayed behind:** `store_keys.def` and every key, the enum it is indexed by,
+  `mesh_ui_store_key_in_cache()` (which file a key belongs to is the application's), and a
+  one-line wrapper per function so no caller in mesh-client changed.
+
+**Next: the journal.** `store_archive.c` and `store_trends.c` each keep an append-only log per
+subject with its own compaction; the step is one journal under both. They name
+`mesh/utils/file.h` and, in the archive, `mesh/ui/nav.h` - each needs its seam before it moves.
+`preferences.c` is independent of both and can come any time.
 
 ### 4. The form model and codec
 
