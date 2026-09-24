@@ -1,6 +1,6 @@
 /*
- * A key table, and the two directions it is read in. See store_key_table.h; the keys themselves
- * are store_keys.c's.
+ * A key table, and the two directions it is read in. See keys.h; the keys themselves are the
+ * application's.
  */
 
 #include "inkstand/persist/keys.h"
@@ -10,17 +10,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-static bool key_in_range(const struct mesh_ui_store_key_table *table, int key) {
+static bool key_in_range(const struct inkstand_key_table *table, int key) {
     return table != NULL && table->rows != NULL && key > 0 && (size_t)key < table->count;
 }
 
-const char *mesh_ui_store_key_table_name(const struct mesh_ui_store_key_table *table, int key) {
+const char *inkstand_key_name(const struct inkstand_key_table *table, int key) {
     return key_in_range(table, key) ? table->rows[key].name : NULL;
 }
 
-enum mesh_ui_store_key_kind
-mesh_ui_store_key_table_kind(const struct mesh_ui_store_key_table *table, int key) {
-    return key_in_range(table, key) ? table->rows[key].kind : MESH_UI_STORE_KEY_KIND_PLAIN;
+enum inkstand_key_kind inkstand_key_kind(const struct inkstand_key_table *table, int key) {
+    return key_in_range(table, key) ? table->rows[key].kind : INKSTAND_KEY_KIND_PLAIN;
 }
 
 /*
@@ -53,10 +52,10 @@ static bool parse_index(const char *text, uint32_t *out, const char **end) {
 
 /* The first row whose name and kind both match. A name may appear twice with two kinds - a
    count and the rows it counts - so both halves have to agree. */
-static int find_key(const struct mesh_ui_store_key_table *table, const char *name, size_t length,
-                    enum mesh_ui_store_key_kind kind) {
+static int find_key(const struct inkstand_key_table *table, const char *name, size_t length,
+                    enum inkstand_key_kind kind) {
     for (size_t i = 1U; i < table->count; ++i) {
-        const struct mesh_ui_store_key_row *row = &table->rows[i];
+        const struct inkstand_key *row = &table->rows[i];
         if (row->name != NULL && row->kind == kind && row->length == length &&
             memcmp(row->name, name, length) == 0) {
             return (int)i;
@@ -65,8 +64,8 @@ static int find_key(const struct mesh_ui_store_key_table *table, const char *nam
     return 0;
 }
 
-int mesh_ui_store_key_table_lookup(const struct mesh_ui_store_key_table *table, const char *text,
-                                   uint32_t *index, uint32_t *slot) {
+int inkstand_key_lookup(const struct inkstand_key_table *table, const char *text, uint32_t *index,
+                        uint32_t *slot) {
     if (index != NULL) {
         *index = 0U;
     }
@@ -79,7 +78,7 @@ int mesh_ui_store_key_table_lookup(const struct mesh_ui_store_key_table *table, 
 
     const char *bracket = strchr(text, '[');
     if (bracket == NULL) {
-        return find_key(table, text, strlen(text), MESH_UI_STORE_KEY_KIND_PLAIN);
+        return find_key(table, text, strlen(text), INKSTAND_KEY_KIND_PLAIN);
     }
 
     const size_t length = (size_t)(bracket - text);
@@ -94,13 +93,13 @@ int mesh_ui_store_key_table_lookup(const struct mesh_ui_store_key_table *table, 
     }
 
     /* `name[3]` is a row; `name[3.1]` is a slot in one. Anything else is neither. */
-    enum mesh_ui_store_key_kind kind = MESH_UI_STORE_KEY_KIND_ROW;
+    enum inkstand_key_kind kind = INKSTAND_KEY_KIND_ROW;
     uint32_t parsed_slot = 0U;
     if (*after == '.') {
         if (!parse_index(after + 1, &parsed_slot, &after)) {
             return 0;
         }
-        kind = MESH_UI_STORE_KEY_KIND_SLOT;
+        kind = INKSTAND_KEY_KIND_SLOT;
     }
     if (after[0] != ']' || after[1] != '\0') {
         return 0;
@@ -121,8 +120,8 @@ int mesh_ui_store_key_table_lookup(const struct mesh_ui_store_key_table *table, 
 
 /* Every writer funnels through here, so a key that is not in the table writes nothing at all
    rather than a line the loader would skip. */
-static bool write_key(FILE *file, const struct mesh_ui_store_key_table *table, int key) {
-    const char *name = mesh_ui_store_key_table_name(table, key);
+static bool write_key(FILE *file, const struct inkstand_key_table *table, int key) {
+    const char *name = inkstand_key_name(table, key);
     if (file == NULL || name == NULL) {
         return false;
     }
@@ -130,8 +129,8 @@ static bool write_key(FILE *file, const struct mesh_ui_store_key_table *table, i
     return true;
 }
 
-void mesh_ui_store_key_table_vwrite(FILE *file, const struct mesh_ui_store_key_table *table,
-                                    int key, const char *fmt, va_list args) {
+void inkstand_key_vwrite(FILE *file, const struct inkstand_key_table *table, int key,
+                         const char *fmt, va_list args) {
     if (!write_key(file, table, key)) {
         return;
     }
@@ -140,8 +139,8 @@ void mesh_ui_store_key_table_vwrite(FILE *file, const struct mesh_ui_store_key_t
     fputc('\n', file);
 }
 
-void mesh_ui_store_key_table_vwrite_row(FILE *file, const struct mesh_ui_store_key_table *table,
-                                        int key, uint32_t index, const char *fmt, va_list args) {
+void inkstand_key_vwrite_row(FILE *file, const struct inkstand_key_table *table, int key,
+                             uint32_t index, const char *fmt, va_list args) {
     if (!write_key(file, table, key)) {
         return;
     }
@@ -150,9 +149,8 @@ void mesh_ui_store_key_table_vwrite_row(FILE *file, const struct mesh_ui_store_k
     fputc('\n', file);
 }
 
-void mesh_ui_store_key_table_vwrite_slot(FILE *file, const struct mesh_ui_store_key_table *table,
-                                         int key, uint32_t index, uint32_t slot, const char *fmt,
-                                         va_list args) {
+void inkstand_key_vwrite_slot(FILE *file, const struct inkstand_key_table *table, int key,
+                              uint32_t index, uint32_t slot, const char *fmt, va_list args) {
     if (!write_key(file, table, key)) {
         return;
     }
@@ -161,8 +159,8 @@ void mesh_ui_store_key_table_vwrite_slot(FILE *file, const struct mesh_ui_store_
     fputc('\n', file);
 }
 
-void mesh_ui_store_key_table_write_text(FILE *file, const struct mesh_ui_store_key_table *table,
-                                        int key, const char *text) {
+void inkstand_key_write_text(FILE *file, const struct inkstand_key_table *table, int key,
+                             const char *text) {
     if (!write_key(file, table, key)) {
         return;
     }
@@ -171,8 +169,8 @@ void mesh_ui_store_key_table_write_text(FILE *file, const struct mesh_ui_store_k
     fputc('\n', file);
 }
 
-void mesh_ui_store_key_table_write_row_text(FILE *file, const struct mesh_ui_store_key_table *table,
-                                            int key, uint32_t index, const char *text) {
+void inkstand_key_write_row_text(FILE *file, const struct inkstand_key_table *table, int key,
+                                 uint32_t index, const char *text) {
     if (!write_key(file, table, key)) {
         return;
     }
@@ -181,9 +179,8 @@ void mesh_ui_store_key_table_write_row_text(FILE *file, const struct mesh_ui_sto
     fputc('\n', file);
 }
 
-void mesh_ui_store_key_table_write_slot_text(FILE *file,
-                                             const struct mesh_ui_store_key_table *table, int key,
-                                             uint32_t index, uint32_t slot, const char *text) {
+void inkstand_key_write_slot_text(FILE *file, const struct inkstand_key_table *table, int key,
+                                  uint32_t index, uint32_t slot, const char *text) {
     if (!write_key(file, table, key)) {
         return;
     }

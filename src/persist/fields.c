@@ -1,5 +1,5 @@
 /*
- * Reading one cache line's value into typed destinations. See store_fields.h for why the field
+ * Reading one record line's value into typed destinations. See fields.h for why the field
  * list replaced a format string, and for the strictness this adds on the way.
  */
 
@@ -22,7 +22,7 @@ static const char *field_token_end(const char *start) {
  *
  * The leading-digit test is load-bearing rather than defensive: strtoull accepts a sign and
  * negates, so without it "-1" would arrive as UINT64_MAX and pass every range check below it
- * by wrapping into range. Checked for ERANGE the way mesh_env_parse_int() checks it, because
+ * by wrapping into range. Checked for ERANGE the way inkwell_env_int() checks it, because
  * where `unsigned long long` is the widest type the target has, saturation is the only thing
  * that can still tell a number at the limit from one far past it.
  */
@@ -79,8 +79,7 @@ static bool field_real(const char *start, const char *stop, float *out) {
     return true;
 }
 
-static bool field_read(const struct mesh_ui_store_field *field, const char *start,
-                       const char *stop) {
+static bool field_read(const struct inkstand_field *field, const char *start, const char *stop) {
     if (field->out == NULL) {
         return false;
     }
@@ -88,37 +87,37 @@ static bool field_read(const struct mesh_ui_store_field *field, const char *star
     uint64_t unsigned_value = 0U;
     int64_t signed_value = 0;
     switch (field->type) {
-    case MESH_UI_STORE_FIELD_TYPE_U32:
+    case INKSTAND_FIELD_TYPE_U32:
         if (!field_unsigned(start, stop, UINT32_MAX, &unsigned_value)) {
             return false;
         }
         *(uint32_t *)field->out = (uint32_t)unsigned_value;
         return true;
-    case MESH_UI_STORE_FIELD_TYPE_U16:
+    case INKSTAND_FIELD_TYPE_U16:
         if (!field_unsigned(start, stop, UINT16_MAX, &unsigned_value)) {
             return false;
         }
         *(uint16_t *)field->out = (uint16_t)unsigned_value;
         return true;
-    case MESH_UI_STORE_FIELD_TYPE_U8:
+    case INKSTAND_FIELD_TYPE_U8:
         if (!field_unsigned(start, stop, UINT8_MAX, &unsigned_value)) {
             return false;
         }
         *(uint8_t *)field->out = (uint8_t)unsigned_value;
         return true;
-    case MESH_UI_STORE_FIELD_TYPE_I32:
+    case INKSTAND_FIELD_TYPE_I32:
         if (!field_signed(start, stop, INT32_MIN, INT32_MAX, &signed_value)) {
             return false;
         }
         *(int32_t *)field->out = (int32_t)signed_value;
         return true;
-    case MESH_UI_STORE_FIELD_TYPE_I16:
+    case INKSTAND_FIELD_TYPE_I16:
         if (!field_signed(start, stop, INT16_MIN, INT16_MAX, &signed_value)) {
             return false;
         }
         *(int16_t *)field->out = (int16_t)signed_value;
         return true;
-    case MESH_UI_STORE_FIELD_TYPE_BOOL:
+    case INKSTAND_FIELD_TYPE_BOOL:
         /* Written as 0 or 1, and read as "anything that is not 0" - so a hand-edited 2 is
            still true rather than a dropped record. The width is the widest the token can
            carry, because the question is only whether it is zero. */
@@ -127,14 +126,13 @@ static bool field_read(const struct mesh_ui_store_field *field, const char *star
         }
         *(bool *)field->out = (unsigned_value != 0U);
         return true;
-    case MESH_UI_STORE_FIELD_TYPE_F32:
+    case INKSTAND_FIELD_TYPE_F32:
         return field_real(start, stop, (float *)field->out);
     }
     return false;
 }
 
-size_t mesh_ui_store_fields_read(const char *value, const struct mesh_ui_store_field *fields,
-                                 size_t count) {
+size_t inkstand_fields_read(const char *value, const struct inkstand_field *fields, size_t count) {
     if (value == NULL || fields == NULL) {
         return 0U;
     }
