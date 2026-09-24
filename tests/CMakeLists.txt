@@ -15,6 +15,7 @@ set(INKSTAND_TEST_CORE_SUITES
 # The half that draws: nav/, form/, app/.
 set(INKSTAND_TEST_UI_SUITES
     suites/nav_frame_scheduler.c
+    suites/app_scene.c
 )
 # The control socket is a Unix socket, and so is its suite: it talks to one directly, through
 # headers Windows does not have. Windows builds the refusing control_unavailable.c instead, and
