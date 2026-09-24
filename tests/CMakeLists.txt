@@ -14,9 +14,14 @@ set(INKSTAND_TEST_CORE_SUITES
 
 # The half that draws: nav/, form/, app/.
 set(INKSTAND_TEST_UI_SUITES
-    suites/app_control.c
     suites/nav_frame_scheduler.c
 )
+# The control socket is a Unix socket, and so is its suite: it talks to one directly, through
+# headers Windows does not have. Windows builds the refusing control_unavailable.c instead, and
+# has nothing here to test against it but the refusal.
+if(NOT WIN32)
+    list(APPEND INKSTAND_TEST_UI_SUITES suites/app_control.c)
+endif()
 
 # Fixtures a second suite needed. The fake store stands in for a store as a frame scheduler sees
 # one, so it lives on the side that has a scheduler.

@@ -215,7 +215,7 @@ static void inkstand_control_run(struct inkstand_control *control) {
 static void inkstand_control_drop_client(struct inkstand_control *control) {
     if (control->client_fd >= 0) {
         inkwell_loop_remove_fd(control->loop, control->client_fd);
-        close(control->client_fd);
+        (void)inkwell_fd_close(control->client_fd);
         control->client_fd = -1;
     }
     control->in_len = 0U;
@@ -229,13 +229,13 @@ static int inkstand_control_on_client(int fd, uint32_t events, void *userdata) {
     struct inkstand_control *const control = (struct inkstand_control *)userdata;
     if ((events & INKWELL_LOOP_IN) != 0U) {
         while (control->in_len < sizeof control->in) {
-            const ssize_t got =
-                read(fd, control->in + control->in_len, sizeof control->in - control->in_len);
+            const int got = inkwell_fd_read(fd, control->in + control->in_len,
+                                            sizeof control->in - control->in_len);
             if (got > 0) {
                 control->in_len += (size_t)got;
                 continue;
             }
-            if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            if (got == -EAGAIN || got == -EWOULDBLOCK || got == -EINTR) {
                 break;
             }
             /* The peer hung up. What it already sent still runs: `echo quit | nc -U` closes
@@ -265,13 +265,13 @@ static int inkstand_control_on_accept(int fd, uint32_t events, void *userdata) {
     if (control->client_fd >= 0) {
         static const char busy[] = "error busy\n";
         (void)send(client, busy, sizeof busy - 1U, MSG_NOSIGNAL);
-        close(client);
+        (void)inkwell_fd_close(client);
         return 0;
     }
     if (inkwell_fd_set_nonblocking_cloexec(client) < 0 ||
         inkwell_loop_add_fd(control->loop, client, INKWELL_LOOP_IN, inkstand_control_on_client,
                             control) < 0) {
-        close(client);
+        (void)inkwell_fd_close(client);
         return 0;
     }
     control->client_fd = client;
@@ -348,10 +348,18 @@ int inkstand_control_open(struct inkstand_control *control, struct inkwell_loop 
         result = -errno;
     }
     if (result < 0) {
-        close(fd);
+        (void)inkwell_fd_close(fd);
         return result;
     }
     control->listen_fd = fd;
+
+    /* Which file bind() made, so close() can tell it from anything put at the path since. */
+    struct stat bound;
+    if (stat(control->path, &bound) == 0) {
+        control->bound = true;
+        control->bound_device = (uint64_t)bound.st_dev;
+        control->bound_inode = (uint64_t)bound.st_ino;
+    }
 
     control->timer_fd = inkwell_timer_open();
     if (control->timer_fd < 0 ||
@@ -378,10 +386,23 @@ void inkstand_control_close(struct inkstand_control *control) {
     }
     if (control->listen_fd >= 0) {
         inkwell_loop_remove_fd(control->loop, control->listen_fd);
-        close(control->listen_fd);
+        (void)inkwell_fd_close(control->listen_fd);
         control->listen_fd = -1;
-        /* Ours: bound by this run, which is the only file this ever removes. */
-        (void)unlink(control->path);
+        /*
+         * Ours: bound by this run, which is the only file this ever removes - and only while it
+         * is still the one at the path. Something else may have unlinked it and put its own
+         * socket or file there since, and that is not ours to delete. Checking and then
+         * unlinking still leaves a window between the two, which is the race open() refuses to
+         * run; here the alternative is leaving a stale socket behind on every clean exit, and a
+         * window this narrow is the better cost.
+         */
+        struct stat now;
+        if (control->bound && lstat(control->path, &now) == 0 && S_ISSOCK(now.st_mode) &&
+            (uint64_t)now.st_dev == control->bound_device &&
+            (uint64_t)now.st_ino == control->bound_inode) {
+            (void)unlink(control->path);
+        }
+        control->bound = false;
     }
     control->loop = NULL;
 }
@@ -417,19 +438,99 @@ static int inkstand_control_read_line(int fd, char *line, size_t cap, char *pend
             }
             return -errno;
         }
-        const ssize_t got =
-            read(fd, pending + *pending_len, INKSTAND_CONTROL_LINE_MAX - *pending_len);
+        const int got =
+            inkwell_fd_read(fd, pending + *pending_len, INKSTAND_CONTROL_LINE_MAX - *pending_len);
         if (got == 0) {
             return -ECONNRESET;
         }
         if (got < 0) {
-            if (errno == EINTR || errno == EAGAIN) {
+            if (got == -EINTR || got == -EAGAIN || got == -EWOULDBLOCK) {
                 continue;
             }
-            return -errno;
+            return got;
         }
         *pending_len += (size_t)got;
     }
+}
+
+/* Waits up to `timeout_ms` for `fd` to be ready for `events`: 0, -ETIMEDOUT or a negative errno.
+   The sending end has no loop, so it waits the way a plain program does. */
+static int inkstand_control_await(int fd, short events, int timeout_ms) {
+    for (;;) {
+        struct pollfd poll_fd = {.fd = fd, .events = events};
+        const int ready = poll(&poll_fd, 1, timeout_ms);
+        if (ready > 0) {
+            return 0;
+        }
+        if (ready == 0) {
+            return -ETIMEDOUT;
+        }
+        if (errno != EINTR) {
+            return -errno;
+        }
+    }
+}
+
+/*
+ * connect() on the socket inkwell hands out, which is non-blocking like every socket it makes.
+ *
+ * A local connect normally completes at once. Where it does not, the two systems say so
+ * differently: EINPROGRESS is a connection finishing in the background, to be waited for and then
+ * asked how it went; Linux's EAGAIN is a listener whose backlog is full, and nothing is in
+ * progress - the call has to be made again. Either way the wait is bounded by `timeout_ms`.
+ */
+static int inkstand_control_connect(int fd, const struct sockaddr_un *address, int timeout_ms) {
+    const uint64_t deadline = inkwell_time_monotonic_ms() + (uint64_t)timeout_ms;
+    for (;;) {
+        if (connect(fd, (const struct sockaddr *)address, sizeof *address) == 0 ||
+            errno == EISCONN) {
+            return 0;
+        }
+        const int error = errno;
+        if (error == EINTR) {
+            continue;
+        }
+        if (error == EINPROGRESS) {
+            const int ready = inkstand_control_await(fd, POLLOUT, timeout_ms);
+            if (ready < 0) {
+                return ready;
+            }
+            int pending = 0;
+            socklen_t size = sizeof pending;
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &pending, &size) < 0) {
+                return -errno;
+            }
+            return -pending;
+        }
+        if ((error != EAGAIN && error != EWOULDBLOCK) || inkwell_time_monotonic_ms() >= deadline) {
+            return error == EAGAIN || error == EWOULDBLOCK ? -ETIMEDOUT : -error;
+        }
+        (void)poll(NULL, 0, 10);
+    }
+}
+
+/* Every byte of `bytes`, waiting for room when the socket has none. */
+static int inkstand_control_send_all(int fd, const char *bytes, size_t len, int timeout_ms) {
+    while (len > 0U) {
+        const ssize_t sent = send(fd, bytes, len, MSG_NOSIGNAL);
+        if (sent > 0) {
+            bytes += sent;
+            len -= (size_t)sent;
+            continue;
+        }
+        if (sent < 0 && errno == EINTR) {
+            continue;
+        }
+        if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            const int ready = inkstand_control_await(fd, POLLOUT, timeout_ms);
+            if (ready < 0) {
+                return ready;
+            }
+            continue;
+        }
+        return sent < 0 ? -errno : -EPIPE;
+    }
+    return 0;
 }
 
 int inkstand_control_send(const char *path, const char *commands, FILE *out) {
@@ -442,15 +543,16 @@ int inkstand_control_send(const char *path, const char *commands, FILE *out) {
     }
     memcpy(address.sun_path, path, strlen(path) + 1U);
 
-    /* Blocking, and so not inkwell_fd_socket(): this end has no loop to stall. */
-    const int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    /* From inkwell like every socket above it, and so non-blocking: this end waits with poll()
+       where a blocking socket would have waited inside the call. */
+    const int fd = inkwell_fd_socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
-        return -errno;
+        return fd;
     }
-    if (connect(fd, (const struct sockaddr *)&address, sizeof address) < 0) {
-        const int error = -errno;
-        close(fd);
-        return error;
+    const int connected = inkstand_control_connect(fd, &address, INKSTAND_CONTROL_ANSWER_MS);
+    if (connected < 0) {
+        (void)inkwell_fd_close(fd);
+        return connected;
     }
 
     int status = 0;
@@ -480,8 +582,8 @@ int inkstand_control_send(const char *path, const char *commands, FILE *out) {
         char command[INKSTAND_CONTROL_LINE_MAX];
         memcpy(command, start, len);
         command[len] = '\n';
-        if (send(fd, command, len + 1U, MSG_NOSIGNAL) != (ssize_t)(len + 1U)) {
-            status = -errno;
+        status = inkstand_control_send_all(fd, command, len + 1U, INKSTAND_CONTROL_ANSWER_MS);
+        if (status < 0) {
             break;
         }
 
@@ -503,6 +605,6 @@ int inkstand_control_send(const char *path, const char *commands, FILE *out) {
         }
     }
     fflush(out);
-    close(fd);
+    (void)inkwell_fd_close(fd);
     return status;
 }

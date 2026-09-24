@@ -79,6 +79,11 @@ struct inkstand_control {
     struct inkwell_loop *loop;
     struct inkstand_control_host host;
     char path[INKSTAND_CONTROL_PATH_MAX];
+    /* The file bind() made at `path`, by device and inode: close() removes the file at the path
+       only while it is still this one. */
+    bool bound;
+    uint64_t bound_device;
+    uint64_t bound_inode;
     int listen_fd;
     int client_fd;
     int timer_fd;
@@ -96,8 +101,8 @@ struct inkstand_control {
  */
 int inkstand_control_open(struct inkstand_control *control, struct inkwell_loop *loop,
                           const struct inkstand_control_host *host, const char *path);
-/* Closes the connection and the socket, and removes the socket's file. Safe on a control that
-   was never opened, provided it was zeroed. */
+/* Closes the connection and the socket, and removes the socket's file if the file at the path is
+   still the one this bound. Safe on a control that was never opened, provided it was zeroed. */
 void inkstand_control_close(struct inkstand_control *control);
 
 /*

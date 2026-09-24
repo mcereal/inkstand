@@ -27,10 +27,12 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 /* A backend with a frame to give and a switch for whether it is still moving. */
@@ -435,6 +437,123 @@ INKSTAND_TEST_CASE(control_close_removes_its_own_socket, unit) {
     INKSTAND_TEST_FAIL_IF(!was_there, "an open control must be a socket at its path");
     INKSTAND_TEST_FAIL_IF(!private_to_us, "...readable and writable by its owner alone");
     INKSTAND_TEST_FAIL_IF(!gone, "closing must remove the socket it bound");
+    record_success(test_name);
+}
+
+/* ...and only while it is still the file at the path: something that replaced it since is not the
+   control's to delete. */
+INKSTAND_TEST_CASE(control_close_leaves_a_replacement_alone, unit) {
+    struct control_test test;
+    INKSTAND_TEST_FAIL_IF(!control_test_open(&test, true), "control socket setup failed");
+    char path[sizeof test.path];
+    memcpy(path, test.path, sizeof path);
+
+    const char *failure = NULL;
+    if (unlink(path) != 0) {
+        failure = "could not unlink the socket";
+    } else {
+        const int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+        if (fd < 0) {
+            failure = "could not put a file at the path";
+        } else {
+            close(fd);
+        }
+    }
+    control_test_close(&test);
+    struct stat info;
+    if (failure == NULL && !(stat(path, &info) == 0 && S_ISREG(info.st_mode))) {
+        failure = "closing must not remove a file that replaced the socket";
+    }
+    unlink(path);
+    INKSTAND_TEST_FAIL_IF(failure != NULL, failure);
+    record_success(test_name);
+}
+
+/*
+ * The sending end, against a listening one. The sender blocks and the listener needs its loop
+ * turned, so the listener is a child process: it opens the socket, runs its loop until `quit`
+ * stops it (or three seconds pass), and exits. The parent retries the first send until the child
+ * is listening.
+ */
+static void control_test_serve(const char *path) {
+    struct inkwell_loop loop;
+    struct test_store store;
+    struct test_snapshot snapshot;
+    struct inkstand_frame_scheduler frames;
+    struct control_test_app app = {0};
+    struct inkstand_control control;
+    const struct inkcell_backend still = {.name = "test-still", .present = control_test_present};
+    struct control_test_backend backend = {0};
+    if (inkwell_loop_init(&loop) != 0 || test_store_open(&store) != 0) {
+        _exit(2);
+    }
+    const struct inkstand_frame_config config =
+        test_store_config(&store, &loop, &still, &backend, &snapshot);
+    const struct inkstand_control_host host = {
+        .frames = &frames,
+        .press = control_test_press,
+        .screen = control_test_screen,
+        .userdata = &app,
+    };
+    if (inkstand_frame_scheduler_init(&frames, &config) != 0 ||
+        inkstand_control_open(&control, &loop, &host, path) != 0) {
+        _exit(3);
+    }
+    /* Bounded, and cut short by `quit`, which stops the loop. */
+    (void)inkwell_loop_run(&loop, 3000);
+    inkstand_control_close(&control);
+    inkstand_frame_scheduler_shutdown(&frames);
+    _exit(app.key_count == 1U ? 0 : 4);
+}
+
+INKSTAND_TEST_CASE(control_send_drives_a_listening_socket, unit) {
+    char path[64];
+    snprintf(path, sizeof path, "/tmp/inkstand-test-send-%ld.sock", (long)getpid());
+    fflush(NULL);
+    const pid_t child = fork();
+    INKSTAND_TEST_FAIL_IF(child < 0, "fork failed");
+    if (child == 0) {
+        control_test_serve(path);
+    }
+
+    char *text = NULL;
+    size_t text_len = 0U;
+    FILE *out = open_memstream(&text, &text_len);
+    const char *failure = NULL;
+    int sent = -ENOENT;
+    for (int tries = 0; tries < 300 && (sent == -ENOENT || sent == -ECONNREFUSED); ++tries) {
+        if (tries > 0) {
+            (void)poll(NULL, 0, 10);
+        }
+        sent = inkstand_control_send(path, "ping; key a; screen; fly; ping", out);
+    }
+    fflush(out);
+    static const char expected[] = "ping: ok\nkey a: ok\nscreen: ok home\n"
+                                   "fly: error unknown command 'fly'\n";
+    if (sent != -EPROTO) {
+        failure = "a command answered with an error must make the send -EPROTO";
+    } else if (text == NULL || strcmp(text, expected) != 0) {
+        failure = "every answer up to the error must be printed, and nothing after it";
+    } else {
+        FILE *sink = fopen("/dev/null", "w");
+        if (sink == NULL || inkstand_control_send(path, "quit", sink) != 0) {
+            failure = "a second connection, after the first hung up, must be answered";
+        }
+        if (sink != NULL) {
+            fclose(sink);
+        }
+    }
+    fclose(out);
+    free(text);
+
+    int status = 0;
+    if (waitpid(child, &status, 0) != child) {
+        failure = failure != NULL ? failure : "the listening child was lost";
+    } else if (failure == NULL && (!WIFEXITED(status) || WEXITSTATUS(status) != 0)) {
+        failure = "the listener must press the one key it was sent, and stop on quit";
+    }
+    unlink(path);
+    INKSTAND_TEST_FAIL_IF(failure != NULL, failure);
     record_success(test_name);
 }
 
