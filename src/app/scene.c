@@ -34,7 +34,7 @@ int inkstand_scene_fail(struct inkstand_scene *scene, const char *format, ...) {
 
 /* The verbs the runner answers itself, before it looks in the application's table. */
 static const char *const scene_generic_verbs[] = {
-    "scene", "scale", "delay", "clock", "theme", "pointer", "key", "frame", "hold",
+    "scene", "scale", "delay", "clock", "theme", "pointer", "key", "frame", "hold", "expect",
 };
 
 int inkstand_scene_init(struct inkstand_scene *scene, const struct inkstand_scene_host *host,
@@ -509,6 +509,30 @@ static int scene_run_generic(struct inkstand_scene *scene, const char *command, 
             return status;
         }
         return scene_hold(scene, ms);
+    }
+
+    /* An assertion rather than a picture: the screen the application says is up. It is what turns
+       a scene into a test - a script that walks somewhere and says where it expects to be fails on
+       the line where it was wrong, not on a frame somebody has to look at. It draws nothing. */
+    if (strcmp(command, "expect") == 0) {
+        const char *what = inkstand_scene_word(&rest);
+        const char *id = inkstand_scene_word(&rest);
+        if (what == NULL || strcmp(what, "screen") != 0 || id == NULL) {
+            return inkstand_scene_fail(scene, "'expect' takes 'screen ID'");
+        }
+        if (scene->host.screen == NULL) {
+            return inkstand_scene_fail(scene,
+                                       "'expect screen' needs a host that names its screens");
+        }
+        if ((status = scene_start(scene)) < 0) {
+            return status;
+        }
+        const char *up = scene->host.screen(scene->host.userdata);
+        if (up == NULL || strcmp(up, id) != 0) {
+            return inkstand_scene_fail(scene, "expected screen '%s', but '%s' is up", id,
+                                       up != NULL ? up : "(none)");
+        }
+        return 0;
     }
 
     return 1;

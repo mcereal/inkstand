@@ -23,6 +23,7 @@
  *   key NAME [COUNT]  press, and film whatever the press set moving
  *   frame             emit the current screen again
  *   hold MS           lengthen the frame just emitted, and move the clock with it
+ *   expect screen ID  fail unless the host's screen() says ID is up; draws nothing
  *
  * Every other verb is the application's, and by default emits one frame and plays out whatever
  * that frame left moving. The runner keeps that rule rather than each verb: when every verb had
@@ -81,8 +82,9 @@ struct inkstand_scene_seed {
  * where the panel would be. `press` is the path a button takes, handed the rows the last frame's
  * paged list had - the controller's job on the device. `tick` is the housekeeping a loop turn
  * does, on the scene's clock: a notice timing out is the usual case, and without it a notice
- * sliding away is not filmable at all. `themed` is told when the look is set or changes, for an
- * application that says what it is drawing with.
+ * sliding away is not filmable at all. `screen` names what is up by the same ASCII id the control
+ * socket's `screen` answers with, for `expect screen`. `themed` is told when the look is set or
+ * changes, for an application that says what it is drawing with.
  *
  * `capture`, `snapshot`, `drain` and `press` are required; the rest may be NULL.
  */
