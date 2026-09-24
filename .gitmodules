@@ -1,0 +1,6 @@
+[submodule "third_party/inkwell"]
+	path = third_party/inkwell
+	url = https://github.com/mcereal/inkwell
+[submodule "third_party/inkcell"]
+	path = third_party/inkcell
+	url = https://github.com/mcereal/inkcell
