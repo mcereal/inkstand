@@ -120,71 +120,88 @@ int inkstand_key_lookup(const struct inkstand_key_table *table, const char *text
 
 /* Every writer funnels through here, so a key that is not in the table writes nothing at all
    rather than a line the loader would skip. */
-static bool write_key(FILE *file, const struct inkstand_key_table *table, int key) {
+static int write_key(FILE *file, const struct inkstand_key_table *table, int key) {
+    if (file == NULL) {
+        return -EINVAL;
+    }
     const char *name = inkstand_key_name(table, key);
-    if (file == NULL || name == NULL) {
-        return false;
+    if (name == NULL) {
+        return -ENOENT;
     }
     fputs(name, file);
-    return true;
+    return 0;
 }
 
-void inkstand_key_vwrite(FILE *file, const struct inkstand_key_table *table, int key,
-                         const char *fmt, va_list args) {
-    if (!write_key(file, table, key)) {
-        return;
+/* And every writer ends here. The stream's error indicator rather than each call's return,
+   because inkwell_record_write_escaped() has none to give and the indicator is what every one
+   of these calls sets when it fails. */
+static int write_end(FILE *file) {
+    fputc('\n', file);
+    return ferror(file) ? -EIO : 0;
+}
+
+int inkstand_key_vwrite(FILE *file, const struct inkstand_key_table *table, int key,
+                        const char *fmt, va_list args) {
+    const int rc = write_key(file, table, key);
+    if (rc != 0) {
+        return rc;
     }
     fputc('=', file);
     vfprintf(file, fmt, args);
-    fputc('\n', file);
+    return write_end(file);
 }
 
-void inkstand_key_vwrite_row(FILE *file, const struct inkstand_key_table *table, int key,
-                             uint32_t index, const char *fmt, va_list args) {
-    if (!write_key(file, table, key)) {
-        return;
+int inkstand_key_vwrite_row(FILE *file, const struct inkstand_key_table *table, int key,
+                            uint32_t index, const char *fmt, va_list args) {
+    const int rc = write_key(file, table, key);
+    if (rc != 0) {
+        return rc;
     }
     fprintf(file, "[%u]=", index);
     vfprintf(file, fmt, args);
-    fputc('\n', file);
+    return write_end(file);
 }
 
-void inkstand_key_vwrite_slot(FILE *file, const struct inkstand_key_table *table, int key,
-                              uint32_t index, uint32_t slot, const char *fmt, va_list args) {
-    if (!write_key(file, table, key)) {
-        return;
+int inkstand_key_vwrite_slot(FILE *file, const struct inkstand_key_table *table, int key,
+                             uint32_t index, uint32_t slot, const char *fmt, va_list args) {
+    const int rc = write_key(file, table, key);
+    if (rc != 0) {
+        return rc;
     }
     fprintf(file, "[%u.%u]=", index, slot);
     vfprintf(file, fmt, args);
-    fputc('\n', file);
+    return write_end(file);
 }
 
-void inkstand_key_write_text(FILE *file, const struct inkstand_key_table *table, int key,
-                             const char *text) {
-    if (!write_key(file, table, key)) {
-        return;
+int inkstand_key_write_text(FILE *file, const struct inkstand_key_table *table, int key,
+                            const char *text) {
+    const int rc = write_key(file, table, key);
+    if (rc != 0) {
+        return rc;
     }
     fputc('=', file);
     inkwell_record_write_escaped(file, text);
-    fputc('\n', file);
+    return write_end(file);
 }
 
-void inkstand_key_write_row_text(FILE *file, const struct inkstand_key_table *table, int key,
-                                 uint32_t index, const char *text) {
-    if (!write_key(file, table, key)) {
-        return;
+int inkstand_key_write_row_text(FILE *file, const struct inkstand_key_table *table, int key,
+                                uint32_t index, const char *text) {
+    const int rc = write_key(file, table, key);
+    if (rc != 0) {
+        return rc;
     }
     fprintf(file, "[%u]=", index);
     inkwell_record_write_escaped(file, text);
-    fputc('\n', file);
+    return write_end(file);
 }
 
-void inkstand_key_write_slot_text(FILE *file, const struct inkstand_key_table *table, int key,
-                                  uint32_t index, uint32_t slot, const char *text) {
-    if (!write_key(file, table, key)) {
-        return;
+int inkstand_key_write_slot_text(FILE *file, const struct inkstand_key_table *table, int key,
+                                 uint32_t index, uint32_t slot, const char *text) {
+    const int rc = write_key(file, table, key);
+    if (rc != 0) {
+        return rc;
     }
     fprintf(file, "[%u.%u]=", index, slot);
     inkwell_record_write_escaped(file, text);
-    fputc('\n', file);
+    return write_end(file);
 }

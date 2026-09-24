@@ -104,6 +104,23 @@ INKSTAND_TEST_CASE(persist_fields_refuse_what_is_not_a_number, unit) {
     INKSTAND_TEST_FAIL_IF(inkstand_fields_read("1.5x", &real_field, 1U) != 0U || real != 1.0f,
                           "a real number with rubbish after it was read");
 
+    /* A real number is held to its destination like an integer is: a double that is no float
+       would cast to an infinity and arrive as a reading. Both sides of the range, and past the
+       double's too. */
+    static const char *const k_too_wide[] = {"1e100", "-1e100", "1e400"};
+    for (size_t i = 0U; i < sizeof k_too_wide / sizeof k_too_wide[0]; ++i) {
+        real = 1.0f;
+        INKSTAND_TEST_FAIL_IF(inkstand_fields_read(k_too_wide[i], &real_field, 1U) != 0U ||
+                                  real != 1.0f,
+                              "a real number too wide for a float was read");
+    }
+    /* The float's own range still reads, and so does a number too small to be anything but
+       a float's zero. */
+    INKSTAND_TEST_FAIL_IF(inkstand_fields_read("3.4e38", &real_field, 1U) != 1U || real < 3.3e38f,
+                          "the largest float's neighbourhood did not read");
+    INKSTAND_TEST_FAIL_IF(inkstand_fields_read("1e-60", &real_field, 1U) != 1U || real != 0.0f,
+                          "a number below a float's range did not read as zero");
+
     record_success(test_name);
 }
 

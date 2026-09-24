@@ -6,6 +6,8 @@
 #include "inkstand/persist/fields.h"
 
 #include <errno.h>
+#include <float.h>
+#include <math.h>
 #include <stdlib.h>
 
 /* Where this token ends: the next comma, or the end of the value. */
@@ -60,19 +62,27 @@ static bool field_signed(const char *start, const char *stop, int64_t low, int64
 }
 
 /*
- * One real number, as the writer's "%f" spelled it.
+ * One real number, as the writer's "%f" spelled it, that fits a float.
  *
- * ERANGE is not a failure here, unlike above: strtod saturates to an infinity the same way
- * sscanf's "%lf" did, and a reading that overflowed a double on the way out is already not a
- * reading. What is rejected is a token that is not wholly a number.
+ * strtod reads into a double, so a token can be a perfectly good double and still be no float:
+ * "1e100" would cast to an infinity and arrive as a reading. That is the same wrapping the
+ * integer fields refuse, and it is refused the same way - whether the token overflowed the
+ * double too (ERANGE) or only the float. What stays readable is an infinity or a NaN spelled as
+ * one, since that is what "%f" writes for a float that already was one. Underflow is not a
+ * failure: a number too small for a float is a float's zero, which is the nearest reading.
  */
 static bool field_real(const char *start, const char *stop, float *out) {
     if (start == stop || *start == ' ' || *start == '\t') {
         return false;
     }
     char *end = NULL;
+    errno = 0;
     const double value = strtod(start, &end);
     if (end != stop) {
+        return false;
+    }
+    const bool overflowed = (errno == ERANGE && (value > FLT_MAX || value < -FLT_MAX));
+    if (overflowed || (isfinite(value) && (value > FLT_MAX || value < -FLT_MAX))) {
         return false;
     }
     *out = (float)value;

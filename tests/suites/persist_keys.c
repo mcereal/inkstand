@@ -10,6 +10,7 @@
 
 #include "inkstand/persist/keys.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -161,31 +162,34 @@ static bool read_back(FILE *file, char *out, size_t size) {
 }
 
 /* The formatted writers take a va_list; this is the wrapper an application writes over them. */
-static void write_plain(FILE *file, int key, const char *fmt, ...)
+static int write_plain(FILE *file, int key, const char *fmt, ...)
     __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 3, 4)));
-static void write_plain(FILE *file, int key, const char *fmt, ...) {
+static int write_plain(FILE *file, int key, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    inkstand_key_vwrite(file, &k_table, key, fmt, args);
+    const int rc = inkstand_key_vwrite(file, &k_table, key, fmt, args);
     va_end(args);
+    return rc;
 }
 
-static void write_row(FILE *file, int key, uint32_t index, const char *fmt, ...)
+static int write_row(FILE *file, int key, uint32_t index, const char *fmt, ...)
     __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 4, 5)));
-static void write_row(FILE *file, int key, uint32_t index, const char *fmt, ...) {
+static int write_row(FILE *file, int key, uint32_t index, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    inkstand_key_vwrite_row(file, &k_table, key, index, fmt, args);
+    const int rc = inkstand_key_vwrite_row(file, &k_table, key, index, fmt, args);
     va_end(args);
+    return rc;
 }
 
-static void write_slot(FILE *file, int key, uint32_t index, uint32_t slot, const char *fmt, ...)
+static int write_slot(FILE *file, int key, uint32_t index, uint32_t slot, const char *fmt, ...)
     __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 5, 6)));
-static void write_slot(FILE *file, int key, uint32_t index, uint32_t slot, const char *fmt, ...) {
+static int write_slot(FILE *file, int key, uint32_t index, uint32_t slot, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    inkstand_key_vwrite_slot(file, &k_table, key, index, slot, fmt, args);
+    const int rc = inkstand_key_vwrite_slot(file, &k_table, key, index, slot, fmt, args);
     va_end(args);
+    return rc;
 }
 
 /* Each writer spells the brackets its name says, and what it writes the lookup reads back. */
@@ -193,12 +197,17 @@ INKSTAND_TEST_CASE(persist_keys_writers_spell_the_brackets, unit) {
     FILE *file = tmpfile();
     INKSTAND_TEST_FAIL_IF(file == NULL, "no temporary file to write into");
 
-    write_plain(file, TEST_KEY_VALID, "%u", 1U);
-    write_row(file, TEST_KEY_ITEM, 3U, "%d,%d", -4, 5);
-    write_slot(file, TEST_KEY_LINK, 2U, 9U, "%u", 7U);
-    inkstand_key_write_text(file, &k_table, TEST_KEY_SAMPLE_COUNT, "text");
-    inkstand_key_write_row_text(file, &k_table, TEST_KEY_SAMPLE, 0U, "row");
-    inkstand_key_write_slot_text(file, &k_table, TEST_KEY_LINK, 1U, 2U, "slot");
+    const int rcs[] = {
+        write_plain(file, TEST_KEY_VALID, "%u", 1U),
+        write_row(file, TEST_KEY_ITEM, 3U, "%d,%d", -4, 5),
+        write_slot(file, TEST_KEY_LINK, 2U, 9U, "%u", 7U),
+        inkstand_key_write_text(file, &k_table, TEST_KEY_SAMPLE_COUNT, "text"),
+        inkstand_key_write_row_text(file, &k_table, TEST_KEY_SAMPLE, 0U, "row"),
+        inkstand_key_write_slot_text(file, &k_table, TEST_KEY_LINK, 1U, 2U, "slot"),
+    };
+    for (size_t i = 0U; i < sizeof rcs / sizeof rcs[0]; ++i) {
+        INKSTAND_TEST_FAIL_IF_CLEANUP(rcs[i] != 0, fclose(file), "a writer did not report success");
+    }
 
     char written[256];
     const bool read = read_back(file, written, sizeof written);
@@ -241,7 +250,9 @@ INKSTAND_TEST_CASE(persist_keys_text_writers_escape, unit) {
     FILE *file = tmpfile();
     INKSTAND_TEST_FAIL_IF(file == NULL, "no temporary file to write into");
 
-    inkstand_key_write_text(file, &k_table, TEST_KEY_VALID, "a\nvalid=0\\b");
+    INKSTAND_TEST_FAIL_IF_CLEANUP(
+        inkstand_key_write_text(file, &k_table, TEST_KEY_VALID, "a\nvalid=0\\b") != 0, fclose(file),
+        "an escaped writer did not report success");
 
     char written[128];
     const bool read = read_back(file, written, sizeof written);
@@ -260,18 +271,53 @@ INKSTAND_TEST_CASE(persist_keys_unknown_key_writes_nothing, unit) {
     FILE *file = tmpfile();
     INKSTAND_TEST_FAIL_IF(file == NULL, "no temporary file to write into");
 
-    write_plain(file, TEST_KEY_NONE, "%u", 1U);
-    write_row(file, TEST_KEY_COUNT, 0U, "%u", 1U);
-    write_slot(file, -1, 0U, 0U, "%u", 1U);
-    inkstand_key_write_text(file, &k_table, TEST_KEY_COUNT, "x");
-    inkstand_key_write_row_text(file, NULL, TEST_KEY_ITEM, 0U, "x");
-    inkstand_key_write_slot_text(NULL, &k_table, TEST_KEY_LINK, 0U, 0U, "x");
+    /* And says so: a key that is not there is -ENOENT, a stream that is not there -EINVAL. */
+    const int rcs[] = {
+        write_plain(file, TEST_KEY_NONE, "%u", 1U),
+        write_row(file, TEST_KEY_COUNT, 0U, "%u", 1U),
+        write_slot(file, -1, 0U, 0U, "%u", 1U),
+        inkstand_key_write_text(file, &k_table, TEST_KEY_COUNT, "x"),
+        inkstand_key_write_row_text(file, NULL, TEST_KEY_ITEM, 0U, "x"),
+    };
+    for (size_t i = 0U; i < sizeof rcs / sizeof rcs[0]; ++i) {
+        INKSTAND_TEST_FAIL_IF_CLEANUP(rcs[i] != -ENOENT, fclose(file),
+                                      "a key outside the table was not refused as -ENOENT");
+    }
+    INKSTAND_TEST_FAIL_IF_CLEANUP(
+        inkstand_key_write_slot_text(NULL, &k_table, TEST_KEY_LINK, 0U, 0U, "x") != -EINVAL,
+        fclose(file), "a NULL stream was not refused as -EINVAL");
 
     char written[64];
     const bool read = read_back(file, written, sizeof written);
     fclose(file);
     INKSTAND_TEST_FAIL_IF(!read, "the temporary file did not read back");
     INKSTAND_TEST_FAIL_IF(written[0] != '\0', "a key outside the table wrote a line");
+
+    record_success(test_name);
+}
+
+/*
+ * A write the stream could not take is reported, not swallowed.
+ *
+ * A stream opened for reading is the portable way to make every write fail - /dev/full is
+ * Linux's - and the failure it gives is the one a full disk gives a caller: the line is not on
+ * disk, and the writer says so. The indicator is sticky, so the next line reports it too.
+ */
+INKSTAND_TEST_CASE(persist_keys_writers_report_a_failed_stream, unit) {
+    static const char k_path[] = "persist_keys_read_only.tmp";
+    FILE *create = fopen(k_path, "w");
+    INKSTAND_TEST_FAIL_IF(create == NULL, "could not create the file to reopen");
+    fclose(create);
+
+    FILE *file = fopen(k_path, "r");
+    INKSTAND_TEST_FAIL_IF_CLEANUP(file == NULL, remove(k_path), "could not reopen the file");
+
+    const int first = write_plain(file, TEST_KEY_VALID, "%u", 1U);
+    const int second = inkstand_key_write_text(file, &k_table, TEST_KEY_VALID, "x");
+    fclose(file);
+    remove(k_path);
+    INKSTAND_TEST_FAIL_IF(first != -EIO, "a write to a read-only stream was not -EIO");
+    INKSTAND_TEST_FAIL_IF(second != -EIO, "a stream already in error did not keep reporting it");
 
     record_success(test_name);
 }

@@ -89,22 +89,28 @@ int inkstand_key_lookup(const struct inkstand_key_table *table, const char *text
  * line. The formatted three take their value already formatted and do not escape it, which is
  * why they should only ever be handed numbers. Each takes a va_list so a caller's own printf-like
  * wrapper can forward to it.
+ *
+ * Each returns 0 once the line is written, -EINVAL for no stream, -ENOENT for a key the table
+ * does not have, and -EIO when the stream is in error after the write - a full disk, a closed
+ * descriptor. The error indicator is sticky, so a stream that failed on an earlier line keeps
+ * reporting it: a caller writing a whole file may check every line or only the last, and learns
+ * either way that the file on disk is not the one it meant to write.
  */
-void inkstand_key_vwrite(FILE *file, const struct inkstand_key_table *table, int key,
-                         const char *fmt, va_list args)
+int inkstand_key_vwrite(FILE *file, const struct inkstand_key_table *table, int key,
+                        const char *fmt, va_list args)
     __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 4, 0)));
-void inkstand_key_vwrite_row(FILE *file, const struct inkstand_key_table *table, int key,
-                             uint32_t index, const char *fmt, va_list args)
+int inkstand_key_vwrite_row(FILE *file, const struct inkstand_key_table *table, int key,
+                            uint32_t index, const char *fmt, va_list args)
     __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 5, 0)));
-void inkstand_key_vwrite_slot(FILE *file, const struct inkstand_key_table *table, int key,
-                              uint32_t index, uint32_t slot, const char *fmt, va_list args)
+int inkstand_key_vwrite_slot(FILE *file, const struct inkstand_key_table *table, int key,
+                             uint32_t index, uint32_t slot, const char *fmt, va_list args)
     __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 6, 0)));
-void inkstand_key_write_text(FILE *file, const struct inkstand_key_table *table, int key,
-                             const char *text);
-void inkstand_key_write_row_text(FILE *file, const struct inkstand_key_table *table, int key,
-                                 uint32_t index, const char *text);
-void inkstand_key_write_slot_text(FILE *file, const struct inkstand_key_table *table, int key,
-                                  uint32_t index, uint32_t slot, const char *text);
+int inkstand_key_write_text(FILE *file, const struct inkstand_key_table *table, int key,
+                            const char *text);
+int inkstand_key_write_row_text(FILE *file, const struct inkstand_key_table *table, int key,
+                                uint32_t index, const char *text);
+int inkstand_key_write_slot_text(FILE *file, const struct inkstand_key_table *table, int key,
+                                 uint32_t index, uint32_t slot, const char *text);
 
 #ifdef __cplusplus
 }
