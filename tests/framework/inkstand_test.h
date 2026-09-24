@@ -1,0 +1,88 @@
+#ifndef INKSTAND_TEST_H
+#define INKSTAND_TEST_H
+
+#include <stdbool.h>
+#include <stddef.h>
+
+/*
+ * The suite is one binary assembled from many small translation units, one per subject area
+ * under tests/suites/. A case registers itself from a constructor, so adding a test is a single
+ * macro in a single file: there is no central table to edit, and no way to write a case that
+ * silently never runs.
+ *
+ * This only works because the suite files are compiled straight into the executable. Rolling
+ * them into a static library would let the linker drop the object files nothing references, and
+ * every case inside them would disappear without a word. tests/CMakeLists.txt says the same.
+ *
+ * Constructors fire in unspecified order across translation units, so the runner sorts by
+ * (file, line) before executing. Listing and run order are therefore source order within a
+ * suite, and suites run alphabetically - stable regardless of how the linker felt that day.
+ */
+
+struct inkstand_test_case {
+    const char *name;
+    const char *category;
+    const char *file;
+    int line;
+    void (*fn)(void);
+    struct inkstand_test_case *next;
+};
+
+void inkstand_test_register(struct inkstand_test_case *node, const char *name, const char *category,
+                            const char *file, int line, void (*fn)(void));
+
+/* Outcome reporting: a case records exactly one of these and returns. */
+void record_failure(const char *test_name, const char *message);
+void record_success(const char *test_name);
+
+/*
+ * Defines a case and registers it. `case_name` is the bare name the runner filters on
+ * (`--filter`, `--list`); `case_category` is the tag CTest labels select (`unit` today).
+ *
+ * The body is an ordinary function body with `test_name` already in scope, so the guard macros
+ * below - and plain record_failure/record_success calls - work without repeating the name:
+ *
+ *     INKSTAND_TEST_CASE(store_starts_empty, unit) {
+ *         struct inkstand_store store;
+ *         INKSTAND_TEST_FAIL_IF(inkstand_store_init(&store) != 0, "init failed");
+ *         record_success(test_name);
+ *     }
+ */
+#define INKSTAND_TEST_CASE(case_name, case_category)                                               \
+    static void inkstand_test_body_##case_name(const char *test_name);                             \
+    static void inkstand_test_entry_##case_name(void) {                                            \
+        inkstand_test_body_##case_name(#case_name);                                                \
+    }                                                                                              \
+    static void inkstand_test_ctor_##case_name(void) __attribute__((constructor));                 \
+    static void inkstand_test_ctor_##case_name(void) {                                             \
+        static struct inkstand_test_case node;                                                     \
+        inkstand_test_register(&node, #case_name, #case_category, __FILE__, __LINE__,              \
+                               inkstand_test_entry_##case_name);                                   \
+    }                                                                                              \
+    static void inkstand_test_body_##case_name(const char *test_name)
+
+/* Records `message` against the running case and returns from it when `condition` holds. */
+#define INKSTAND_TEST_FAIL_IF(condition, message)                                                  \
+    do {                                                                                           \
+        if (condition) {                                                                           \
+            record_failure(test_name, (message));                                                  \
+            return;                                                                                \
+        }                                                                                          \
+    } while (0)
+
+/*
+ * The same, for a case holding something that has to be released - an event loop, a mock, an
+ * open fd. `cleanup` is a statement list run before the case gives up:
+ *
+ *     INKSTAND_TEST_FAIL_IF_CLEANUP(result != 0, inkwell_loop_shutdown(&loop), "start failed");
+ */
+#define INKSTAND_TEST_FAIL_IF_CLEANUP(condition, cleanup, message)                                 \
+    do {                                                                                           \
+        if (condition) {                                                                           \
+            cleanup;                                                                               \
+            record_failure(test_name, (message));                                                  \
+            return;                                                                                \
+        }                                                                                          \
+    } while (0)
+
+#endif /* INKSTAND_TEST_H */
