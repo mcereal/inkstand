@@ -196,16 +196,53 @@ static bool test_rig_run_until(struct test_rig *rig, unsigned frames) {
     return rig->backend.frames >= frames;
 }
 
+/* Every config that would start a scheduler unable to draw is refused rather than accepted:
+   no loop watches nothing, no wake never drains the first refresh, and a zero interval is the
+   timer's "disarm", which would leave a frame marked armed that never fires. */
 INKSTAND_TEST_CASE(frame_scheduler_refuses_a_config_it_cannot_run, unit) {
-    struct inkstand_frame_scheduler scheduler;
-    struct test_snapshot snapshot;
-    struct inkstand_frame_config config = {.wake_fd = -1, .drain = test_store_drain};
-    INKSTAND_TEST_FAIL_IF(inkstand_frame_scheduler_init(&scheduler, &config) != -EINVAL,
-                          "a scheduler with nowhere to put a snapshot must refuse");
-    config.snapshot = &snapshot;
-    config.drain = NULL;
-    INKSTAND_TEST_FAIL_IF(inkstand_frame_scheduler_init(&scheduler, &config) != -EINVAL,
-                          "a scheduler with no way to drain the store must refuse");
+    struct test_rig rig;
+    memset(&rig, 0, sizeof rig);
+    INKSTAND_TEST_FAIL_IF(inkwell_loop_init(&rig.loop) != 0, "loop init failed");
+    INKSTAND_TEST_FAIL_IF_CLEANUP(inkwell_wake_open(&rig.store.wake) != 0,
+                                  inkwell_loop_shutdown(&rig.loop), "wake open failed");
+
+    static const char *const reasons[] = {
+        "a scheduler with nowhere to put a snapshot must refuse",
+        "a scheduler with no way to drain the store must refuse",
+        "a scheduler with no loop must refuse",
+        "a scheduler with no wake must refuse",
+        "a scheduler with a zero frame interval must refuse",
+    };
+    const char *failure = NULL;
+    for (size_t i = 0U; i < sizeof reasons / sizeof reasons[0] && failure == NULL; ++i) {
+        struct inkstand_frame_config config = test_config(&rig, &test_moving_backend);
+        switch (i) {
+        case 0U:
+            config.snapshot = NULL;
+            break;
+        case 1U:
+            config.drain = NULL;
+            break;
+        case 2U:
+            config.loop = NULL;
+            break;
+        case 3U:
+            config.wake_fd = -1;
+            break;
+        default:
+            config.interval_ms = 0U;
+            break;
+        }
+        if (inkstand_frame_scheduler_init(&rig.scheduler, &config) != -EINVAL) {
+            failure = reasons[i];
+        } else if (rig.backend.shutdowns != 0U || rig.store.refreshes != 0U) {
+            failure = "a refused config must not open the backend or touch the store";
+        }
+    }
+
+    inkwell_wake_close(&rig.store.wake);
+    inkwell_loop_shutdown(&rig.loop);
+    INKSTAND_TEST_FAIL_IF(failure != NULL, failure);
     record_success(test_name);
 }
 

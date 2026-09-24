@@ -42,6 +42,8 @@ typedef void (*inkstand_frame_unchanged_fn)(void *userdata, void *snapshot);
 /* Asks the store to publish once even though nothing has changed. */
 typedef void (*inkstand_frame_refresh_fn)(void *userdata);
 
+/* init() refuses, with -EINVAL, a config missing the loop, the wake, the snapshot, the drain or a
+   nonzero interval: each would start a scheduler that can never draw. */
 struct inkstand_frame_config {
     struct inkwell_loop *loop;
     /* Optional. A backend whose init() refuses is dropped, and the scheduler carries on
@@ -51,7 +53,7 @@ struct inkstand_frame_config {
     /* Where drained snapshots are kept. Owned by the caller and sized by it; the scheduler only
        passes the pointer to drain() and present(). */
     void *snapshot;
-    /* Readable when the store has something to publish. -1 for none. */
+    /* Readable when the store has something to publish. */
     int wake_fd;
     inkstand_frame_drain_fn drain;
     inkstand_frame_unchanged_fn unchanged; /* optional */

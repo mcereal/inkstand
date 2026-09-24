@@ -97,7 +97,7 @@ static int timer_callback(int fd, uint32_t events, void *userdata) {
 static void setup_timer(struct inkstand_frame_scheduler *scheduler) {
     scheduler->timer_fd = -1;
     struct inkwell_loop *loop = scheduler->config.loop;
-    if (loop == NULL || scheduler->backend == NULL || scheduler->backend->animating == NULL) {
+    if (scheduler->backend == NULL || scheduler->backend->animating == NULL) {
         return;
     }
 
@@ -122,7 +122,14 @@ static void drop_backend(struct inkstand_frame_scheduler *scheduler) {
 
 int inkstand_frame_scheduler_init(struct inkstand_frame_scheduler *scheduler,
                                   const struct inkstand_frame_config *config) {
-    if (scheduler == NULL || config == NULL || config->snapshot == NULL || config->drain == NULL) {
+    /*
+     * Each of these would start a scheduler that can never draw: with no loop nothing is
+     * watched, with no wake the first refresh is published and never drained, and a zero interval
+     * is arm_once()'s "disarm" - a frame recorded as armed that never fires, so animation stops
+     * and settled() never comes true. Refused here rather than discovered as a blank panel.
+     */
+    if (scheduler == NULL || config == NULL || config->loop == NULL || config->wake_fd < 0 ||
+        config->snapshot == NULL || config->drain == NULL || config->interval_ms == 0U) {
         return -EINVAL;
     }
 
@@ -143,19 +150,17 @@ int inkstand_frame_scheduler_init(struct inkstand_frame_scheduler *scheduler,
         }
     }
 
-    if (config->loop != NULL && config->wake_fd >= 0) {
-        const int added = inkwell_loop_add_fd(config->loop, config->wake_fd, INKWELL_LOOP_IN,
-                                              wake_callback, scheduler);
-        if (added < 0) {
-            inkwell_log_error("ui", "Failed to watch the store's wake: %d", added);
-            if (scheduler->backend != NULL && scheduler->backend->shutdown != NULL) {
-                scheduler->backend->shutdown(scheduler->backend_state, scheduler->backend_userdata);
-            }
-            drop_backend(scheduler);
-            return added;
+    const int added = inkwell_loop_add_fd(config->loop, config->wake_fd, INKWELL_LOOP_IN,
+                                          wake_callback, scheduler);
+    if (added < 0) {
+        inkwell_log_error("ui", "Failed to watch the store's wake: %d", added);
+        if (scheduler->backend != NULL && scheduler->backend->shutdown != NULL) {
+            scheduler->backend->shutdown(scheduler->backend_state, scheduler->backend_userdata);
         }
-        scheduler->registered = true;
+        drop_backend(scheduler);
+        return added;
     }
+    scheduler->registered = true;
 
     setup_timer(scheduler);
 
