@@ -9,7 +9,8 @@
 # The headless half: state/ and persist/. These build and run with INKSTAND_WITH_UI=OFF, which
 # is the proof they need nothing from inkcell.
 set(INKSTAND_TEST_CORE_SUITES
-    suites/tree_core.c
+    suites/persist_fields.c
+    suites/persist_keys.c
 )
 
 # The half that draws: nav/, form/, app/.
