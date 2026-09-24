@@ -42,19 +42,38 @@ mesh-client's snapshot and its command table - so the half that decides what a p
 the application's, and it now stands on the scheduler rather than beside it. It comes down when
 step 7 gives a screen its own `on_key`, not before.
 
-### 2. The control socket and the scene runner
+### 2. The control socket - done
 
-`src/app/app_control.c` (509 lines) is the Unix socket that lets a developer or an agent press
-keys by name, wait, and bring back a frame as a picture - what mesh-client's `make ui-drive`
-stands on. `devtools/ui_capture/` (about 3,200 lines) drives the same presses through a script
-and renders every frame off-screen. Every application on this stack wants both, on day one.
+**Moved:** `include/inkstand/app/control.h` and `src/app/control.c`, from mesh-client's
+`src/app/app_control.c`: the Unix socket that lets a developer or an agent press keys by name,
+wait, and bring back a frame as a picture - what mesh-client's `make ui-drive` stands on. Both
+ends came: the listening end on the loop, and the blocking sending end a program's "send these
+commands" flag runs. Windows builds `control_unavailable.c`, which refuses every call.
 
-What it names across the line: `mesh/ui/controller.h` and `mesh/ui/route.h`. After step 1 the
-first is two questions the scheduler answers - `settled()` and `frame()` - and one it cannot,
-pressing a key, which is a callback. The second is a callback returning the current screen's
-ASCII id - which the screen stack in step 7 answers for free.
+The seam is `struct inkstand_control_host`, and it is what this page guessed: the frame
+scheduler from step 1 answers `settled()` and `frame()` for `shot`, a `press` callback is `key`,
+and an optional `screen` callback returns an ASCII id. Its cases came with it as
+`tests/suites/app_control.c`, over a fake host, with new ones for `wait`, a second connection,
+and the socket removing only its own file. The fake store moved to `tests/support/` when this
+second suite needed it.
 
-**Stays behind:** mesh-client's scenes, and the socket path and environment variable names.
+**Stayed behind:** the flag and environment variable that name the socket, the scripts that
+clear a stale one, and the test that the default config opens none - all mesh-client's.
+
+### 2b. The scene runner
+
+`devtools/ui_capture/main.c` (about 3,200 lines) drives presses through a script and renders
+every frame off-screen. It was listed with the control socket and did not come with it, because
+the evidence says it is a different kind of move: of the ~40 verbs mesh-client's scenes use,
+the generic ones - `key`, `hold`, `delay`, `frame`, `theme`, `scale`, `clock` - are a handful,
+and the rest build Meshtastic fixtures (`airtime`, `firmware-install`, `broker`, `verify`, ...).
+Its includes are almost all mesh-client's session, firmware and link headers.
+
+The seam is a verb table the application adds rows to - the generic verbs here, the fixtures
+there, one parser - plus the off-screen render loop. That is a design, not a file move, and it
+wants the second application from the open questions below before it is called general.
+
+**Stays behind:** every fixture verb, and mesh-client's scenes.
 
 ### 3. Persistence
 

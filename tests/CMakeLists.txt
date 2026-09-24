@@ -14,12 +14,19 @@ set(INKSTAND_TEST_CORE_SUITES
 
 # The half that draws: nav/, form/, app/.
 set(INKSTAND_TEST_UI_SUITES
+    suites/app_control.c
     suites/nav_frame_scheduler.c
+)
+
+# Fixtures a second suite needed. The fake store stands in for a store as a frame scheduler sees
+# one, so it lives on the side that has a scheduler.
+set(INKSTAND_TEST_UI_SUPPORT
+    support/test_store.c
 )
 
 set(INKSTAND_TEST_SUITES ${INKSTAND_TEST_CORE_SUITES})
 if(INKSTAND_WITH_UI)
-    list(APPEND INKSTAND_TEST_SUITES ${INKSTAND_TEST_UI_SUITES})
+    list(APPEND INKSTAND_TEST_SUITES ${INKSTAND_TEST_UI_SUITES} ${INKSTAND_TEST_UI_SUPPORT})
 endif()
 
 add_executable(inkstand_tests
