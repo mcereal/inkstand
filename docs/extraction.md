@@ -121,11 +121,14 @@ scenes in-process over the fake host in `tests/support/`, and an `expect screen 
    scenes were byte-identical across it. Two fixes followed as their own commits, each found by
    making a rule the runner's: 26 verbs had emitted without settling, and a second `syncing`
    verb had never been reachable.
-2. The runner moved here as `app/scene` in a commit that is only a move, then renamed
-   `uicap_scene_*` to `inkstand_scene_*` in the next.
-3. Its cases, written here as `tests/suites/app_scene.c`. `main.c` had none of its own -
+2. *Done.* The runner moved here as `include/inkstand/app/scene.h` and `src/app/scene.c` in a
+   commit that is only a move, then renamed `uicap_scene_*` to `inkstand_scene_*` in the next.
+   `expect screen ID` came with it, over the host's `screen()`.
+3. *Done.* Its cases, written here as `tests/suites/app_scene.c`, over a counter for a host and
+   an `inkcell_fb_app` that says how long it is still moving. `main.c` had none of its own -
    mesh-client's `ui_capture` suite tests inkcell's capture, not the script.
-4. mesh-client's half, deleting its copy.
+4. mesh-client's half, switching `devtools/ui_capture/main.c` to this runner and deleting its
+   copy.
 
 **Stays behind:** every fixture verb, the invented radio, mesh-client's scenes,
 `scripts/ui-capture.sh` and `frames.py`. So do `tab` and `context` for now - both need
