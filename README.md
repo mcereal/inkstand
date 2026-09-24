@@ -24,11 +24,12 @@ can write.
 
 ## Status
 
-**A skeleton, not a framework yet.** The build, the layering rule, the test runner and CI are
-here; no code is. What will arrive, from where, and in what order is
-[`docs/extraction.md`](docs/extraction.md), and why it is shaped the way it is is
-[`docs/architecture.md`](docs/architecture.md). Everything below describes the areas the code
-will land in, not code you can call today.
+**Early: one component, and the skeleton around it.** The build, the layering rule, the test
+runner and CI are here, and so is the first piece to come down from mesh-client - the frame
+scheduler in `nav/`, which draws only while something is moving. What arrives next, from where
+and in what order is [`docs/extraction.md`](docs/extraction.md), and why it is shaped the way it
+is is [`docs/architecture.md`](docs/architecture.md). The table below describes the areas the
+code is landing in; most of them are still empty.
 
 ## Why it exists
 

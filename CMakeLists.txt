@@ -73,10 +73,10 @@ endif()
 # the journals. It links inkwell and nothing else, so a program with nothing to draw uses it
 # without a toolkit in its link line. inkstand is the rest - nav/, form/, app/ - and adds inkcell.
 #
-# Both are INTERFACE targets while there is no source to compile: an add_library(STATIC) with
-# no sources is a configure error. The first file to land in an area turns its library STATIC,
-# with the sources listed here and grouped by area as inkwell's are. Consumers link the aliases
-# and never notice the change.
+# inkstand_core is an INTERFACE target while state/ and persist/ have no source to compile: an
+# add_library(STATIC) with no sources is a configure error. The first file to land in one of
+# those areas turns it STATIC, as inkstand below already is. Consumers link the aliases and never
+# notice the change.
 add_library(inkstand_core INTERFACE)
 target_include_directories(inkstand_core INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -86,8 +86,17 @@ target_link_libraries(inkstand_core INTERFACE inkwell::inkwell)
 add_library(inkstand::core ALIAS inkstand_core)
 
 if(INKSTAND_WITH_UI)
-    add_library(inkstand INTERFACE)
-    target_link_libraries(inkstand INTERFACE inkstand_core inkcell::inkcell)
+    # Grouped by area, as inkwell's sources are.
+    add_library(inkstand STATIC
+        # nav/ - where the reader is, and when a frame is drawn
+        src/nav/frame_scheduler.c
+    )
+    # PUBLIC: the headers hand out inkwell and inkcell types - an inkwell_loop, an
+    # inkcell_backend - so anything compiling against inkstand/ needs both include paths.
+    target_link_libraries(inkstand
+        PUBLIC inkstand_core inkcell::inkcell
+        PRIVATE inkstand_options
+    )
     add_library(inkstand::inkstand ALIAS inkstand)
     message(STATUS "inkstand: nav, form and app over inkcell")
 else()

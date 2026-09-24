@@ -14,7 +14,7 @@ set(INKSTAND_TEST_CORE_SUITES
 
 # The half that draws: nav/, form/, app/.
 set(INKSTAND_TEST_UI_SUITES
-    suites/tree_ui.c
+    suites/nav_frame_scheduler.c
 )
 
 set(INKSTAND_TEST_SUITES ${INKSTAND_TEST_CORE_SUITES})
