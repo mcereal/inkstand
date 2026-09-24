@@ -24,12 +24,14 @@ can write.
 
 ## Status
 
-**Early: one component, and the skeleton around it.** The build, the layering rule, the test
-runner and CI are here, and so is the first piece to come down from mesh-client - the frame
-scheduler in `nav/`, which draws only while something is moving. What arrives next, from where
-and in what order is [`docs/extraction.md`](docs/extraction.md), and why it is shaped the way it
-is is [`docs/architecture.md`](docs/architecture.md). The table below describes the areas the
-code is landing in; most of them are still empty.
+**Early: two components, and the skeleton around them.** The build, the layering rule, the test
+runner and CI are here, and so are the first pieces to come down from mesh-client: the frame
+scheduler in `nav/`, which draws only while something is moving, and the control socket in
+`app/`, which lets a developer or an agent press keys by name and bring back a picture of the
+frame. What arrives next, from where and in what order is
+[`docs/extraction.md`](docs/extraction.md), and why it is shaped the way it is is
+[`docs/architecture.md`](docs/architecture.md). The table below describes the areas the code is
+landing in; most of them are still empty.
 
 ## Why it exists
 

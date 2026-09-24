@@ -2,10 +2,8 @@
  * The frame scheduler: drain on a wake, present, and keep a timer armed only while the backend
  * is moving.
  *
- * inkstand has no store yet, so the one here is the smallest thing that behaves like one: a wake
- * that says something was published, a counter that is the "something", and a flag on the
- * snapshot saying whether this frame changed anything. That is the whole of what the scheduler
- * is allowed to know about a store, so it is also the whole of what a test needs.
+ * inkstand has no store yet, so the one here is tests/support/test_store.h: the smallest thing
+ * that behaves like one, which is also the whole of what the scheduler is allowed to know.
  *
  * Moved from mesh-client's ui_input suite with the scheduler, where the same cases ran against
  * its real store.
@@ -13,6 +11,7 @@
 #include "framework/inkstand_test.h"
 
 #include "inkstand/nav/frame_scheduler.h"
+#include "support/test_store.h"
 
 #include "inkcell/ui/backend.h"
 #include "inkcell/ui/focus.h"
@@ -24,18 +23,6 @@
 #include <stdint.h>
 #include <string.h>
 
-struct test_snapshot {
-    uint32_t version;
-    bool changed;
-};
-
-struct test_store {
-    struct inkwell_wake wake;
-    uint32_t version;
-    bool pending;
-    unsigned refreshes;
-};
-
 struct test_backend {
     int init_result;
     bool moving;
@@ -45,43 +32,6 @@ struct test_backend {
     uint32_t page_rows;
     struct inkcell_focus_map map;
 };
-
-static bool test_store_drain(void *userdata, void *snapshot) {
-    struct test_store *store = (struct test_store *)userdata;
-    (void)inkwell_wake_drain(&store->wake);
-    if (!store->pending) {
-        return false;
-    }
-    store->pending = false;
-    struct test_snapshot *out = (struct test_snapshot *)snapshot;
-    out->version = store->version;
-    out->changed = true;
-    return true;
-}
-
-static void test_store_unchanged(void *userdata, void *snapshot) {
-    (void)userdata;
-    ((struct test_snapshot *)snapshot)->changed = false;
-}
-
-static void test_store_refresh(void *userdata) {
-    struct test_store *store = (struct test_store *)userdata;
-    store->refreshes++;
-    store->pending = true;
-    (void)inkwell_wake_signal(&store->wake);
-}
-
-/* A change the store has not announced - what a publish in the same loop batch as a timer
-   frame looks like from the timer's side. */
-static void test_store_change_quietly(struct test_store *store) {
-    store->version++;
-    store->pending = true;
-}
-
-static void test_store_publish(struct test_store *store) {
-    test_store_change_quietly(store);
-    (void)inkwell_wake_signal(&store->wake);
-}
 
 static int test_backend_init(void **state, void *userdata) {
     *state = userdata;
@@ -143,19 +93,7 @@ struct test_rig {
 
 static struct inkstand_frame_config test_config(struct test_rig *rig,
                                                 const struct inkcell_backend *backend) {
-    const struct inkstand_frame_config config = {
-        .loop = &rig->loop,
-        .backend = backend,
-        .backend_userdata = &rig->backend,
-        .snapshot = &rig->snapshot,
-        .wake_fd = rig->store.wake.fd,
-        .drain = test_store_drain,
-        .unchanged = test_store_unchanged,
-        .refresh = test_store_refresh,
-        .source_userdata = &rig->store,
-        .interval_ms = 5U,
-    };
-    return config;
+    return test_store_config(&rig->store, &rig->loop, backend, &rig->backend, &rig->snapshot);
 }
 
 static int test_rig_open(struct test_rig *rig, const struct inkcell_backend *backend) {

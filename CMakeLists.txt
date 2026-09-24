@@ -86,10 +86,20 @@ target_link_libraries(inkstand_core INTERFACE inkwell::inkwell)
 add_library(inkstand::core ALIAS inkstand_core)
 
 if(INKSTAND_WITH_UI)
+    # A platform gap refuses rather than disappearing - inkwell's rule. The control socket is a
+    # Unix socket, so Windows builds the file that says so to every caller.
+    if(WIN32)
+        set(INKSTAND_CONTROL_SOURCE src/app/control_unavailable.c)
+    else()
+        set(INKSTAND_CONTROL_SOURCE src/app/control.c)
+    endif()
+
     # Grouped by area, as inkwell's sources are.
     add_library(inkstand STATIC
         # nav/ - where the reader is, and when a frame is drawn
         src/nav/frame_scheduler.c
+        # app/ - the composition of the rest, and the socket that drives it from outside
+        ${INKSTAND_CONTROL_SOURCE}
     )
     # PUBLIC: the headers hand out inkwell and inkcell types - an inkwell_loop, an
     # inkcell_backend - so anything compiling against inkstand/ needs both include paths.
