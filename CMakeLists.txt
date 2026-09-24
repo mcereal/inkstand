@@ -100,6 +100,7 @@ if(INKSTAND_WITH_UI)
         src/nav/frame_scheduler.c
         # app/ - the composition of the rest, and the socket that drives it from outside
         ${INKSTAND_CONTROL_SOURCE}
+        src/app/scene.c
     )
     # PUBLIC: the headers hand out inkwell and inkcell types - an inkwell_loop, an
     # inkcell_backend - so anything compiling against inkstand/ needs both include paths.
