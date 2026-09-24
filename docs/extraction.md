@@ -60,20 +60,78 @@ second suite needed it.
 **Stayed behind:** the flag and environment variable that name the socket, the scripts that
 clear a stale one, and the test that the default config opens none - all mesh-client's.
 
-### 2b. The scene runner
+### 2b. The scene runner - designed, in progress
 
-`devtools/ui_capture/main.c` (about 3,200 lines) drives presses through a script and renders
-every frame off-screen. It was listed with the control socket and did not come with it, because
-the evidence says it is a different kind of move: of the ~40 verbs mesh-client's scenes use,
-the generic ones - `key`, `hold`, `delay`, `frame`, `theme`, `scale`, `clock` - are a handful,
-and the rest build Meshtastic fixtures (`airtime`, `firmware-install`, `broker`, `verify`, ...).
-Its includes are almost all mesh-client's session, firmware and link headers.
+`devtools/ui_capture/main.c` (3,184 lines) drives presses through a script and renders every
+frame off-screen. It is the control socket's offline twin: the same press and the same screen
+id, on a clock the script names instead of the real one, into memory instead of onto a panel.
 
-The seam is a verb table the application adds rows to - the generic verbs here, the fixtures
-there, one parser - plus the off-screen render loop. That is a design, not a file move, and it
-wants the second application from the open questions below before it is called general.
+**What the evidence says.** This page first read it as a handful of generic verbs and a long
+list of fixtures, and by *verb* that is right: of about forty, seven are generic and the rest
+build Meshtastic state (`airtime`, `firmware-install`, `broker`, `verify`, ...). By *use* it is
+the other way round. Of the lines mesh-client's 74 scenes contain, `hold` and `key` are about
+1,100, `tab` and the setup verbs (`scene`, `scale`, `delay`, `theme`, `clock`, `frame`) about
+340, and every fixture together about 200. The code splits the same way: about 400 lines of
+engine - the tokenizer, emit, settle, hold, the frame manifest - over roughly 2,700 of invented
+radio and fixture verbs. And the off-screen render loop this page expected to move is already
+down: inkcell's `inkcell_capture_*` owns the clock, `animating()`, the render and the PPM. What
+is left is policy - when a frame is emitted and how long it stays up.
 
-**Stays behind:** every fixture verb, and mesh-client's scenes.
+**The seam** is the control socket's, with the frame scheduler's callback types:
+
+- `struct inkstand_scene_host` - the capture, the snapshot, `drain` and `refresh` (the
+  `inkstand_frame_*_fn` types from step 1), `press(key, page_rows)`, `tick(now_ms)` for the
+  housekeeping a loop turn does, `screen()` as the control host has it, a table of named seeds
+  for `scene NAME`, a `started` hook, and the application's verb table.
+- `struct inkstand_scene_verb` - a name, a flag or two (setup-only; emits its own frames), and
+  `int run(scene, args, userdata)`. The fixtures become rows of this; helpers to take a word, the
+  rest of the line and a bounded number, and to emit and settle, are public so a row is as short
+  as the branch it replaces.
+- `struct inkstand_scene_sink` - where frames go. `frame(index, capture)` when one is drawn, and
+  `delay(index, ms)` once its delay is final. The file sink writes the PPMs and `frames.txt`; a
+  test's sink counts.
+
+Four rules it holds, each a change from `main.c`:
+
+1. **No `exit()`, and no files unless the sink writes them.** A verb returns 0 or a negative
+   errno and the runner records the line it failed on. A scene then runs in-process, which is
+   the first piece of the screen test harness in [architecture](architecture.md#what-is-new-rather-than-moved).
+   Its diagnostics are ASCII for a developer, like the control socket's `error busy` - not a
+   word a user reads.
+2. **"Every command emits one frame" is the runner's rule, not each verb's.** 33 fixture
+   branches end in a hand-written emit; here the runner emits and settles after any verb that
+   does not say otherwise, so a new fixture cannot forget.
+3. **Nothing grows.** `hold` only ever lengthens the frame just emitted, so one pending delay is
+   all the state the manifest needs: frame N's delay is final when frame N+1 is drawn or the
+   script ends. That is what `delay()` on the sink is for, and it retires `main.c`'s `realloc`.
+4. **The numbers are the application's.** The frame interval, the settle cap, the default
+   delay and the geometry are passed in, as the frame scheduler's interval is.
+
+**The second application.** The verb-table half of the header is marked unstable until the
+step-4 application uses it. The engine's second user is this repository's own suite, running
+scenes in-process over the fake host in `tests/support/`, and an `expect screen ID` verb over
+`screen()` is what turns a scene into a test.
+
+**In order:**
+
+1. *Done, mesh-client #317.* A baseline of every scene's frames by delay and pixel hash, with the
+   wall clock pinned - without the pin, 18 scenes differ between two runs of the same binary.
+   Then the seam, in its own commit: `devtools/ui_capture/scene.{c,h}` is the runner and names
+   nothing of mesh-client's, and `main.c` is the host, 37 verb rows and two seeds. All 78
+   scenes were byte-identical across it. Two fixes followed as their own commits, each found by
+   making a rule the runner's: 26 verbs had emitted without settling, and a second `syncing`
+   verb had never been reachable.
+2. The runner moved here as `app/scene` in a commit that is only a move, then renamed
+   `uicap_scene_*` to `inkstand_scene_*` in the next.
+3. Its cases, written here as `tests/suites/app_scene.c`. `main.c` had none of its own -
+   mesh-client's `ui_capture` suite tests inkcell's capture, not the script.
+4. mesh-client's half, deleting its copy.
+
+**Stays behind:** every fixture verb, the invented radio, mesh-client's scenes,
+`scripts/ui-capture.sh` and `frames.py`. So do `tab` and `context` for now - both need
+mesh-client's screen order and focus ids, and `tab` needs to know that the shoulders mean "the
+next tab" - until step 7 gives this side a screen list. `toast` stays until step 5 brings the
+overlays down.
 
 ### 3. Persistence
 
