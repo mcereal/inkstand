@@ -1,5 +1,4 @@
-#ifndef MESH_UI_FORM_SCALE_H
-#define MESH_UI_FORM_SCALE_H
+#pragma once
 
 /*
  * How a form row walks its values: a number through a list of presets, and a choice through a
@@ -31,7 +30,7 @@ extern "C" {
  * 0xFFFFFFB0), so a threshold list in negative decibels steps correctly without anything here
  * knowing it is signed. A list that mixes signs does not, and says so by stepping wrong.
  */
-struct mesh_ui_form_presets {
+struct inkstand_form_presets {
     const uint32_t *values;
     size_t count;
     /*
@@ -53,8 +52,8 @@ struct mesh_ui_form_presets {
 /* The next preset above (delta > 0) or below (delta < 0) `value`, or `value` itself at either
    end, with no presets, or with a delta of 0. A value between two presets steps to the nearer
    one in the direction asked. */
-uint32_t mesh_ui_form_presets_step(const struct mesh_ui_form_presets *presets, uint32_t value,
-                                   int delta);
+uint32_t inkstand_form_presets_step(const struct inkstand_form_presets *presets, uint32_t value,
+                                    int delta);
 
 /*
  * Where a value sits on a track, for a row that draws one.
@@ -64,7 +63,7 @@ uint32_t mesh_ui_form_presets_step(const struct mesh_ui_form_presets *presets, u
  * room for; `position` is then 0 and `stops` still counts the marks, so a caller can lay the
  * control out without testing first.
  */
-struct mesh_ui_form_track {
+struct inkstand_form_track {
     int32_t position;
     uint32_t stops;
     bool unplaced;
@@ -85,8 +84,8 @@ struct mesh_ui_form_track {
  * One function answers position, count and placement together: a control measured twice is a
  * control that disagrees with itself.
  */
-bool mesh_ui_form_presets_track(const struct mesh_ui_form_presets *presets, uint32_t value,
-                                struct mesh_ui_form_track *out);
+bool inkstand_form_presets_track(const struct inkstand_form_presets *presets, uint32_t value,
+                                 struct inkstand_form_track *out);
 
 /*
  * The two halves of a row whose values are a set: is this one in it, and what is the next one.
@@ -102,11 +101,9 @@ bool mesh_ui_form_presets_track(const struct mesh_ui_form_presets *presets, uint
  * outside the range starts the walk from 0: the other end may be holding a value this build
  * does not know, and a press on that row has to land on one that exists.
  */
-bool mesh_ui_form_choice_allowed(uint32_t choices, uint32_t count, uint32_t value);
-uint32_t mesh_ui_form_choice_step(uint32_t choices, uint32_t count, uint32_t current, int delta);
+bool inkstand_form_choice_allowed(uint32_t choices, uint32_t count, uint32_t value);
+uint32_t inkstand_form_choice_step(uint32_t choices, uint32_t count, uint32_t current, int delta);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

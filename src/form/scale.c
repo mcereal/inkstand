@@ -1,13 +1,13 @@
 /*
- * A number row's presets and a choice row's set - see mesh/ui/form_scale.h.
+ * A number row's presets and a choice row's set - see inkstand/form/scale.h.
  */
 
 #include "inkstand/form/scale.h"
 
 #include "inkcell/ui/anim.h"
 
-uint32_t mesh_ui_form_presets_step(const struct mesh_ui_form_presets *presets, uint32_t value,
-                                   int delta) {
+uint32_t inkstand_form_presets_step(const struct inkstand_form_presets *presets, uint32_t value,
+                                    int delta) {
     if (presets == NULL || presets->values == NULL || delta == 0) {
         return value;
     }
@@ -45,8 +45,8 @@ uint32_t mesh_ui_form_presets_step(const struct mesh_ui_form_presets *presets, u
  * all-negative list for the reason the header gives: two's complement keeps their order, and an
  * unsigned difference of two of them is the true distance between them.
  */
-bool mesh_ui_form_presets_track(const struct mesh_ui_form_presets *presets, uint32_t value,
-                                struct mesh_ui_form_track *out) {
+bool inkstand_form_presets_track(const struct inkstand_form_presets *presets, uint32_t value,
+                                 struct inkstand_form_track *out) {
     if (presets == NULL || !presets->scale || presets->values == NULL) {
         return false;
     }
@@ -57,7 +57,7 @@ bool mesh_ui_form_presets_track(const struct mesh_ui_form_presets *presets, uint
     const uint32_t *stops = presets->values + aside;
     const size_t last = presets->count - aside - 1U;
 
-    struct mesh_ui_form_track track = {.stops = (uint32_t)(last + 1U)};
+    struct inkstand_form_track track = {.stops = (uint32_t)(last + 1U)};
     if (value < stops[0]) {
         /*
          * Below the bottom stop is off the track, on every scale rather than only on the ones
@@ -90,7 +90,7 @@ bool mesh_ui_form_presets_track(const struct mesh_ui_form_presets *presets, uint
     return true;
 }
 
-bool mesh_ui_form_choice_allowed(uint32_t choices, uint32_t count, uint32_t value) {
+bool inkstand_form_choice_allowed(uint32_t choices, uint32_t count, uint32_t value) {
     if (value >= count) {
         return false;
     }
@@ -102,7 +102,7 @@ bool mesh_ui_form_choice_allowed(uint32_t choices, uint32_t count, uint32_t valu
     return value < 32U && (choices & (1U << value)) != 0U;
 }
 
-uint32_t mesh_ui_form_choice_step(uint32_t choices, uint32_t count, uint32_t current, int delta) {
+uint32_t inkstand_form_choice_step(uint32_t choices, uint32_t count, uint32_t current, int delta) {
     if (count == 0U) {
         return current;
     }
@@ -113,7 +113,7 @@ uint32_t mesh_ui_form_choice_step(uint32_t choices, uint32_t count, uint32_t cur
     const uint32_t forward = delta < 0 ? count - 1U : 1U;
     for (uint32_t step = 0; step < count; ++step) {
         value = (value + forward) % count;
-        if (mesh_ui_form_choice_allowed(choices, count, value)) {
+        if (inkstand_form_choice_allowed(choices, count, value)) {
             return value;
         }
     }
