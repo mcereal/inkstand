@@ -88,33 +88,51 @@ void inkstand_toast_post(struct inkstand_toast *toast, uint64_t now_ms, const ch
 }
 
 /*
- * Only the one showing has been seen. Cleared along with it, the queue would outlive the snackbar
- * and sit unwalked - the tick only promotes while something is showing - until a later notice went
- * straight up ahead of it and the older ones followed, out of order. The one promoted here is
- * undated, exactly as a notice a press raises is, and is dated before anything is drawn.
+ * Only the one showing has been seen, so only the one showing goes. What is waiting stays queued
+ * and is put up by date() or the next tick - *after* the press has had its say. Promoted here, a
+ * waiting notice would be up for the length of the press and then lost to the notice the press
+ * itself raised, which is most presses that dismiss one.
  */
 bool inkstand_toast_dismiss(struct inkstand_toast *toast) {
     if (toast == NULL || toast->text[0] == '\0') {
         return false;
     }
-    if (toast->queued > 0U) {
-        promote(toast, 0U);
-    } else {
-        toast->text[0] = '\0';
-        toast->until_ms = 0U;
-    }
+    toast->text[0] = '\0';
+    toast->until_ms = 0U;
     return true;
 }
 
 void inkstand_toast_date(struct inkstand_toast *toast, uint64_t now_ms) {
-    if (toast == NULL || toast->text[0] == '\0' || toast->until_ms != 0U) {
+    if (toast == NULL) {
         return;
     }
-    toast->until_ms = now_ms + INKSTAND_TOAST_STAND_MS;
+    if (toast->text[0] == '\0') {
+        /* Nothing showing, and something waiting - a press dismissed a notice and raised none of
+           its own. The next one starts standing now. */
+        if (toast->queued > 0U) {
+            promote(toast, now_ms + INKSTAND_TOAST_STAND_MS);
+        }
+        return;
+    }
+    if (toast->until_ms == 0U) {
+        toast->until_ms = now_ms + INKSTAND_TOAST_STAND_MS;
+    }
 }
 
 bool inkstand_toast_tick(struct inkstand_toast *toast, uint64_t now_ms) {
-    if (toast == NULL || toast->text[0] == '\0' || now_ms < toast->until_ms) {
+    if (toast == NULL) {
+        return false;
+    }
+    if (toast->text[0] == '\0') {
+        /* Nothing showing is not the same as nothing to show: whatever took a notice down without
+           dating the snackbar afterwards leaves the queue for the tick, rather than stranded. */
+        if (toast->queued == 0U) {
+            return false;
+        }
+        promote(toast, now_ms + INKSTAND_TOAST_STAND_MS);
+        return true;
+    }
+    if (now_ms < toast->until_ms) {
         return false;
     }
     if (toast->queued > 0U) {

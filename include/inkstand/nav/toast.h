@@ -16,8 +16,10 @@
  *     nothing, so it waits its turn - behind the others already waiting, which is what stops a
  *     burst of arrivals showing only whichever came last.
  *
- *   - **A press dismisses, and the next one waiting takes the snackbar.** Only the one showing has
- *     been seen; what is queued behind it is news the press did not answer.
+ *   - **A press dismisses, and the next one waiting takes the snackbar - after the press.** Only
+ *     the one showing has been seen; what is queued is news the press did not answer. It goes up
+ *     once the press is done, so a notice the press raised itself takes precedence and the one
+ *     waiting keeps waiting rather than being put up and overwritten in the same breath.
  *
  * And one decision about time: **a notice can be raised undated.** Whoever handles a press may
  * have no clock to hand, and the drivers of one program need not share one - a device ticks with
@@ -90,15 +92,17 @@ void inkstand_toast_raise(struct inkstand_toast *toast, const char *text);
    reported twice in a row is one notice, not two. */
 void inkstand_toast_post(struct inkstand_toast *toast, uint64_t now_ms, const char *text);
 
-/* Takes down what is showing, for a press, and puts up the next one waiting, undated. Returns true
-   when anything was showing. */
+/* Takes down what is showing, for a press, and leaves what is waiting queued: date() or the next
+   tick puts it up once the press has raised whatever it raises. Returns true when anything was
+   showing. */
 bool inkstand_toast_dismiss(struct inkstand_toast *toast);
 
-/* Dates an undated notice from `now_ms`. A no-op on a dated notice or on none. */
+/* Called after a press, from the driver's clock: dates a notice the press raised undated, or, when
+   the press left nothing showing, puts up the next one waiting. A no-op on a dated notice. */
 void inkstand_toast_date(struct inkstand_toast *toast, uint64_t now_ms);
 
-/* Retires a notice whose time is up and promotes the next one waiting, dated from `now_ms`.
-   Returns true when what is showing changed. */
+/* Retires a notice whose time is up, or finds nothing showing, and promotes the next one waiting,
+   dated from `now_ms`. Returns true when what is showing changed. */
 bool inkstand_toast_tick(struct inkstand_toast *toast, uint64_t now_ms);
 
 #ifdef __cplusplus

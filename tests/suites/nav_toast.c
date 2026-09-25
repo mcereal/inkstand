@@ -112,8 +112,8 @@ INKSTAND_TEST_CASE(toast_stands_its_time_and_drops_a_repeat_of_what_shows, unit)
 }
 
 /*
- * A press dismisses what is showing and the next one waiting takes its place, undated - it is
- * dated by whoever drives the frames, as a notice a press raises is.
+ * A press dismisses what is showing, and the next one waiting takes the snackbar once the press is
+ * done: date() puts it up from the driver's clock, and until then it is still queued.
  */
 INKSTAND_TEST_CASE(toast_dismiss_hands_the_snackbar_to_the_next_one_waiting, unit) {
     struct inkstand_toast toast;
@@ -125,25 +125,78 @@ INKSTAND_TEST_CASE(toast_dismiss_hands_the_snackbar_to_the_next_one_waiting, uni
     inkstand_toast_post(&toast, 1000U, "first");
     inkstand_toast_post(&toast, 1000U, "second");
     inkstand_toast_post(&toast, 1000U, "third");
-    INKSTAND_TEST_FAIL_IF(!inkstand_toast_dismiss(&toast) || strcmp(toast.text, "second") != 0 ||
-                              toast.until_ms != 0U || toast.queued != 1U,
-                          "a dismiss should promote the oldest waiting notice, undated");
+    INKSTAND_TEST_FAIL_IF(!inkstand_toast_dismiss(&toast) || toast.text[0] != '\0' ||
+                              toast.queued != 2U,
+                          "a dismiss should take down only what was showing");
+    inkstand_toast_date(&toast, 1200U);
+    INKSTAND_TEST_FAIL_IF(strcmp(toast.text, "second") != 0 ||
+                              toast.until_ms != 1200U + INKSTAND_TOAST_STAND_MS ||
+                              toast.queued != 1U,
+                          "after the press, the oldest waiting notice should go up, dated");
 
     /* A later arrival waits behind it rather than jumping the queue. */
-    inkstand_toast_post(&toast, 1100U, "fourth");
-    INKSTAND_TEST_FAIL_IF(strcmp(toast.text, "second") != 0 || toast.queued != 2U ||
-                              strcmp(toast.queue[0], "third") != 0,
+    inkstand_toast_post(&toast, 1300U, "fourth");
+    INKSTAND_TEST_FAIL_IF(toast.queued != 2U || strcmp(toast.queue[0], "third") != 0,
                           "an arrival after a dismiss should wait behind what was uncovered");
 
-    inkstand_toast_date(&toast, 1200U);
-    INKSTAND_TEST_FAIL_IF(toast.until_ms != 1200U + INKSTAND_TOAST_STAND_MS,
-                          "the uncovered notice should be dated from the clock it is given");
-
     (void)inkstand_toast_dismiss(&toast);
+    inkstand_toast_date(&toast, 1400U);
     (void)inkstand_toast_dismiss(&toast);
-    INKSTAND_TEST_FAIL_IF(!inkstand_toast_dismiss(&toast) || toast.text[0] != '\0' ||
-                              toast.queued != 0U,
+    inkstand_toast_date(&toast, 1500U);
+    INKSTAND_TEST_FAIL_IF(strcmp(toast.text, "fourth") != 0 || toast.queued != 0U,
+                          "each dismiss should uncover the next, in order");
+    INKSTAND_TEST_FAIL_IF(!inkstand_toast_dismiss(&toast) || toast.text[0] != '\0',
                           "dismissing the last one should leave the snackbar empty");
+    inkstand_toast_date(&toast, 1600U);
+    INKSTAND_TEST_FAIL_IF(toast.text[0] != '\0',
+                          "dating an empty snackbar with nothing waiting should put up nothing");
+    record_success(test_name);
+}
+
+/*
+ * The press that dismisses a notice usually answers with one of its own. The answer takes the
+ * snackbar and what was waiting keeps waiting - promoted during the press, it would have been put
+ * up and overwritten in the same breath, and lost.
+ */
+INKSTAND_TEST_CASE(toast_a_press_that_answers_keeps_what_was_waiting, unit) {
+    struct inkstand_toast toast;
+    inkstand_toast_init(&toast);
+
+    inkstand_toast_post(&toast, 1000U, "arrived");
+    inkstand_toast_post(&toast, 1000U, "arrived too");
+    (void)inkstand_toast_dismiss(&toast);
+    inkstand_toast_raise(&toast, "the press answered");
+    inkstand_toast_date(&toast, 1200U);
+    INKSTAND_TEST_FAIL_IF(strcmp(toast.text, "the press answered") != 0 || toast.queued != 1U ||
+                              strcmp(toast.queue[0], "arrived too") != 0,
+                          "a press's own notice should show and leave the waiting one queued");
+    INKSTAND_TEST_FAIL_IF(!inkstand_toast_tick(&toast, 1200U + INKSTAND_TOAST_STAND_MS) ||
+                              strcmp(toast.text, "arrived too") != 0,
+                          "the waiting notice should follow once the answer has stood");
+
+    /* The same with a notice set from a clock rather than raised. */
+    inkstand_toast_post(&toast, 9000U, "later");
+    (void)inkstand_toast_dismiss(&toast);
+    inkstand_toast_set(&toast, 9100U, "set by the press");
+    INKSTAND_TEST_FAIL_IF(strcmp(toast.text, "set by the press") != 0 || toast.queued != 1U,
+                          "a set notice after a dismiss should leave the waiting one queued");
+    record_success(test_name);
+}
+
+/* Nothing showing is not nothing to show: a tick puts up what a dismiss left waiting. */
+INKSTAND_TEST_CASE(toast_tick_puts_up_what_was_left_waiting, unit) {
+    struct inkstand_toast toast;
+    inkstand_toast_init(&toast);
+
+    inkstand_toast_post(&toast, 1000U, "first");
+    inkstand_toast_post(&toast, 1000U, "second");
+    (void)inkstand_toast_dismiss(&toast);
+    INKSTAND_TEST_FAIL_IF(!inkstand_toast_tick(&toast, 1100U) ||
+                              strcmp(toast.text, "second") != 0 ||
+                              toast.until_ms != 1100U + INKSTAND_TOAST_STAND_MS,
+                          "a tick should put up a waiting notice when nothing is showing");
+    INKSTAND_TEST_FAIL_IF(inkstand_toast_tick(&toast, 1200U),
+                          "and then leave it standing its time");
     record_success(test_name);
 }
 
