@@ -97,7 +97,8 @@ bool inkstand_form_presets_track(const struct inkstand_form_presets *presets, ui
  *
  * step() walks in `delta`'s direction until it finds a value in the set, and answers `current`
  * when there is no other - a row with one legal value is a row Left and Right do nothing to,
- * which is the truth rather than a press that silently lands where it started. A `current`
+ * which is the truth rather than a press that silently lands where it started. A `delta` of 0
+ * has no direction and answers `current`, as presets_step() does. A `current`
  * outside the range starts the walk from 0: the other end may be holding a value this build
  * does not know, and a press on that row has to land on one that exists.
  */

@@ -202,6 +202,11 @@ INKSTAND_TEST_CASE(form_choice_step_walks_the_set, unit) {
                           "a set with nothing inside the range should leave the row where it is");
     INKSTAND_TEST_FAIL_IF(inkstand_form_choice_step(0U, 0U, 1U, +1) != 1U,
                           "an empty range should leave the row where it is");
+
+    /* No delta is no direction: the row stays, as a preset row does. */
+    INKSTAND_TEST_FAIL_IF(inkstand_form_choice_step(0U, 4U, 1U, 0) != 1U ||
+                              inkstand_form_choice_step(mask, 8U, 4U, 0) != 4U,
+                          "a delta of 0 should leave the row where it is");
     record_success(test_name);
 }
 

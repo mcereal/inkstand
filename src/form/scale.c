@@ -103,7 +103,9 @@ bool inkstand_form_choice_allowed(uint32_t choices, uint32_t count, uint32_t val
 }
 
 uint32_t inkstand_form_choice_step(uint32_t choices, uint32_t count, uint32_t current, int delta) {
-    if (count == 0U) {
+    /* No delta has no direction, and presets_step() answers it with the value it was given; a
+       choice row that stepped forward on a 0 would change a value nobody asked to change. */
+    if (count == 0U || delta == 0) {
         return current;
     }
     /* Start from somewhere inside the range even when `current` is not: the other end may be
