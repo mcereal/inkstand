@@ -247,7 +247,29 @@ as a `.def`; `form/` reads a table of descriptors and never an enum it owns.
   spellings - `MESH_UI_COORD_DIGITS` and the coordinate pair, the `!` node number, the key sizes -
   and every `mesh_ui_settings_*` entry point, so no caller in mesh-client changed.
 
-**Next:** the mechanism half of `settings.c` and `settings_rows.c`, over a table of descriptors.
+**4b. The number scale and the choice set - done.** The two walks a row makes through its
+values, which needed no field id at all.
+
+- **Moved:** `include/inkstand/form/scale.h` and `src/form/scale.c`: a number row's presets
+  (`struct inkstand_form_presets` - the values, whether they measure or name, whether a leading
+  0 is a word stood aside), the step through them, the track a scale is drawn as, and the
+  bitmask walk a choice row makes. The seam was made in mesh-client first, as `form_scale.{c,h}`:
+  the four preset columns of its field table became one member, and the macros that fill them
+  brace their values, so the table's positional rows did not change.
+- **Decided on the way:** the track's 0..1000 is inkcell's `INKCELL_ANIM_ONE`, a meter's fill,
+  rather than a number of this area's own - the one thing a track is for is being drawn beside
+  one. The header states the contract an all-negative list relies on: the order is uint32_t's.
+- **Tests:** `tests/suites/form_scale.c`. The step, track and choice cases came from
+  mesh-client's settings suite over preset lists of the suite's own; the cases for a value
+  between or past the presets, an all-negative list, a single stop, a repeat and a mask past the
+  range are new. mesh-client's cases stay too, because they also hold which of its fields is a
+  scale.
+- **Stayed behind:** every preset list and which field uses it, the kind check in front of each
+  call, and `struct mesh_ui_settings_track`, which the renderer still reads.
+
+**Next:** the field descriptor and its kinds (`form/field.h`) - which wants mesh-client's field
+enum turned into a `.def` first, and a 16-bit field id, since a form of 200 fields is already
+most of the way to an 8-bit one. Then pending edits, then the row model.
 
 ### 5. The overlays
 
