@@ -97,6 +97,17 @@ INKSTAND_TEST_CASE(toast_stands_its_time_and_drops_a_repeat_of_what_shows, unit)
     inkstand_toast_set(&toast, 2000U, longer);
     INKSTAND_TEST_FAIL_IF(strlen(toast.text) != INKSTAND_TOAST_TEXT_MAX - 1U,
                           "a notice too long for the snackbar should be cut to fit");
+    /* And a repeat of it is still a repeat, cut or not - against what is showing and against the
+       newest thing waiting. */
+    inkstand_toast_post(&toast, 2000U, longer);
+    INKSTAND_TEST_FAIL_IF(toast.queued != 0U,
+                          "a long notice repeating what is showing should not queue");
+    inkstand_toast_post(&toast, 2000U, "between");
+    longer[0] = 'y';
+    inkstand_toast_post(&toast, 2000U, longer);
+    inkstand_toast_post(&toast, 2000U, longer);
+    INKSTAND_TEST_FAIL_IF(toast.queued != 2U,
+                          "a long notice repeating the newest waiting one should be dropped");
     record_success(test_name);
 }
 

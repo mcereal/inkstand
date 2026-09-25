@@ -38,8 +38,12 @@ static bool queue(struct inkstand_toast *toast, const char *text) {
     if (toast->text[0] == '\0') {
         return false; /* nothing is up; say it now */
     }
+    /* Compared as it would be stored: a notice too long for the snackbar is kept cut to fit, and
+       the same long notice twice would otherwise never match its own stored copy. */
+    char stored[INKSTAND_TOAST_TEXT_MAX];
+    snprintf(stored, sizeof stored, "%s", text);
     const char *newest = toast->queued > 0U ? toast->queue[toast->queued - 1U] : toast->text;
-    if (strcmp(newest, text) == 0) {
+    if (strcmp(newest, stored) == 0) {
         return true;
     }
     if (toast->queued >= INKSTAND_TOAST_QUEUE) {
