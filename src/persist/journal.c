@@ -26,8 +26,8 @@
 /* ---- names ---------------------------------------------------------------------------------- */
 
 static bool journal_word_char(char c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-           c == '-' || c == '_';
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' ||
+           c == '_';
 }
 
 /* A plain word: non-empty, short enough, and nothing in it that could name another directory. */
@@ -44,16 +44,16 @@ static bool journal_word(const char *word, size_t max) {
     return true;
 }
 
-bool mesh_ui_journal_enabled(const struct mesh_ui_journal *journal) {
+bool inkstand_journal_enabled(const struct inkstand_journal *journal) {
     return journal != NULL && journal->dir[0] != '\0';
 }
 
-int mesh_ui_journal_path(const struct mesh_ui_journal *journal, const char *subject, char *out,
-                         size_t out_len) {
-    if (out == NULL || out_len == 0U || !journal_word(subject, MESH_UI_JOURNAL_SUBJECT_MAX)) {
+int inkstand_journal_path(const struct inkstand_journal *journal, const char *subject, char *out,
+                          size_t out_len) {
+    if (out == NULL || out_len == 0U || !journal_word(subject, INKSTAND_JOURNAL_SUBJECT_MAX)) {
         return -EINVAL;
     }
-    if (!mesh_ui_journal_enabled(journal)) {
+    if (!inkstand_journal_enabled(journal)) {
         return -ENOENT;
     }
     const int written = snprintf(out, out_len, "%s/%s%s", journal->dir, subject, journal->suffix);
@@ -65,8 +65,8 @@ int mesh_ui_journal_path(const struct mesh_ui_journal *journal, const char *subj
 
 /* ---- opening one ---------------------------------------------------------------------------- */
 
-int mesh_ui_journal_init(struct mesh_ui_journal *journal, const char *dir, const char *suffix,
-                         uint64_t max_bytes) {
+int inkstand_journal_init(struct inkstand_journal *journal, const char *dir, const char *suffix,
+                          uint64_t max_bytes) {
     if (journal == NULL) {
         return -EINVAL;
     }
@@ -95,9 +95,9 @@ int mesh_ui_journal_init(struct mesh_ui_journal *journal, const char *dir, const
     return 0;
 }
 
-bool mesh_ui_journal_exists(const struct mesh_ui_journal *journal, const char *subject) {
-    char path[MESH_UI_JOURNAL_PATH_MAX];
-    if (mesh_ui_journal_path(journal, subject, path, sizeof path) != 0) {
+bool inkstand_journal_exists(const struct inkstand_journal *journal, const char *subject) {
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    if (inkstand_journal_path(journal, subject, path, sizeof path) != 0) {
         return false;
     }
     FILE *file = fopen(path, "r");
@@ -124,16 +124,16 @@ static int journal_stream_size(FILE *file, long *out) {
     return 0;
 }
 
-int mesh_ui_journal_append(const struct mesh_ui_journal *journal, const char *subject,
-                           mesh_ui_journal_append_fn write, void *context, bool *out_over_cap) {
+int inkstand_journal_append(const struct inkstand_journal *journal, const char *subject,
+                            inkstand_journal_append_fn write, void *context, bool *out_over_cap) {
     if (out_over_cap != NULL) {
         *out_over_cap = false;
     }
     if (write == NULL) {
         return -EINVAL;
     }
-    char path[MESH_UI_JOURNAL_PATH_MAX];
-    const int named = mesh_ui_journal_path(journal, subject, path, sizeof path);
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    const int named = inkstand_journal_path(journal, subject, path, sizeof path);
     if (named == -ENOENT) {
         return 0; /* disabled: quiet */
     }
@@ -178,13 +178,13 @@ int mesh_ui_journal_append(const struct mesh_ui_journal *journal, const char *su
 
 /* ---- reading and replacing ------------------------------------------------------------------ */
 
-int mesh_ui_journal_read(const struct mesh_ui_journal *journal, const char *subject, char *line,
-                         size_t capacity, inkwell_record_visit_fn visit, void *context) {
+int inkstand_journal_read(const struct inkstand_journal *journal, const char *subject, char *line,
+                          size_t capacity, inkwell_record_visit_fn visit, void *context) {
     if (line == NULL || visit == NULL) {
         return -EINVAL;
     }
-    char path[MESH_UI_JOURNAL_PATH_MAX];
-    const int named = mesh_ui_journal_path(journal, subject, path, sizeof path);
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    const int named = inkstand_journal_path(journal, subject, path, sizeof path);
     if (named != 0) {
         return named;
     }
@@ -197,20 +197,20 @@ int mesh_ui_journal_read(const struct mesh_ui_journal *journal, const char *subj
     return result;
 }
 
-int mesh_ui_journal_replace(const struct mesh_ui_journal *journal, const char *subject,
-                            inkwell_record_write_fn write, void *context) {
+int inkstand_journal_replace(const struct inkstand_journal *journal, const char *subject,
+                             inkwell_record_write_fn write, void *context) {
     if (write == NULL) {
         return -EINVAL;
     }
-    char path[MESH_UI_JOURNAL_PATH_MAX];
-    const int named = mesh_ui_journal_path(journal, subject, path, sizeof path);
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    const int named = inkstand_journal_path(journal, subject, path, sizeof path);
     if (named == -ENOENT) {
         return 0;
     }
     if (named != 0) {
         return named;
     }
-    char temp[MESH_UI_JOURNAL_PATH_MAX];
+    char temp[INKSTAND_JOURNAL_PATH_MAX];
     return inkwell_record_replace(path, temp, sizeof temp, write, context, false);
 }
 
@@ -243,15 +243,15 @@ static int journal_next_line(FILE *file, char *line, size_t capacity) {
     return ferror(file) ? -EIO : 0;
 }
 
-int mesh_ui_journal_filter(const struct mesh_ui_journal *journal, const char *subject, char *line,
-                           size_t capacity, mesh_ui_journal_filter_fn filter,
-                           mesh_ui_journal_filter_end_fn end, void *context) {
+int inkstand_journal_filter(const struct inkstand_journal *journal, const char *subject, char *line,
+                            size_t capacity, inkstand_journal_filter_fn filter,
+                            inkstand_journal_filter_end_fn end, void *context) {
     if (line == NULL || capacity < 2U || capacity > (size_t)INT32_MAX || filter == NULL ||
         end == NULL) {
         return -EINVAL;
     }
-    char path[MESH_UI_JOURNAL_PATH_MAX];
-    const int named = mesh_ui_journal_path(journal, subject, path, sizeof path);
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    const int named = inkstand_journal_path(journal, subject, path, sizeof path);
     if (named == -ENOENT) {
         return 0;
     }
@@ -263,7 +263,7 @@ int mesh_ui_journal_filter(const struct mesh_ui_journal *journal, const char *su
     if (source == NULL) {
         return (errno == ENOENT) ? 0 : -errno;
     }
-    char temp[MESH_UI_JOURNAL_PATH_MAX];
+    char temp[INKSTAND_JOURNAL_PATH_MAX];
     const int temp_named = snprintf(temp, sizeof temp, "%s" JOURNAL_TEMP_SUFFIX, path);
     if (temp_named <= 0 || (size_t)temp_named >= sizeof temp) {
         fclose(source);
@@ -309,9 +309,9 @@ int mesh_ui_journal_filter(const struct mesh_ui_journal *journal, const char *su
 
 /* ---- forgetting ----------------------------------------------------------------------------- */
 
-int mesh_ui_journal_forget(const struct mesh_ui_journal *journal, const char *subject) {
-    char path[MESH_UI_JOURNAL_PATH_MAX];
-    const int named = mesh_ui_journal_path(journal, subject, path, sizeof path);
+int inkstand_journal_forget(const struct inkstand_journal *journal, const char *subject) {
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    const int named = inkstand_journal_path(journal, subject, path, sizeof path);
     if (named == -ENOENT) {
         return 0;
     }
@@ -330,15 +330,15 @@ static bool journal_ends_with(const char *name, size_t name_len, const char *suf
     return name_len > suffix_len && memcmp(name + name_len - suffix_len, suffix, suffix_len) == 0;
 }
 
-int mesh_ui_journal_forget_all(const struct mesh_ui_journal *journal) {
-    if (!mesh_ui_journal_enabled(journal)) {
+int inkstand_journal_forget_all(const struct inkstand_journal *journal) {
+    if (!inkstand_journal_enabled(journal)) {
         return 0;
     }
     DIR *dir = opendir(journal->dir);
     if (dir == NULL) {
         return (errno == ENOENT) ? 0 : -errno;
     }
-    char temp_suffix[MESH_UI_JOURNAL_SUFFIX_MAX + sizeof JOURNAL_TEMP_SUFFIX];
+    char temp_suffix[INKSTAND_JOURNAL_SUFFIX_MAX + sizeof JOURNAL_TEMP_SUFFIX];
     snprintf(temp_suffix, sizeof temp_suffix, "%s" JOURNAL_TEMP_SUFFIX, journal->suffix);
 
     int dropped = 0;
@@ -354,7 +354,7 @@ int mesh_ui_journal_forget_all(const struct mesh_ui_journal *journal) {
         if (!is_file && !is_temp) {
             continue;
         }
-        char path[MESH_UI_JOURNAL_DIR_MAX + 256U];
+        char path[INKSTAND_JOURNAL_DIR_MAX + 256U];
         const int written = snprintf(path, sizeof path, "%s/%s", journal->dir, name);
         if (written <= 0 || (size_t)written >= sizeof path) {
             continue;
@@ -369,8 +369,8 @@ int mesh_ui_journal_forget_all(const struct mesh_ui_journal *journal) {
 
 /* ---- the ring ------------------------------------------------------------------------------- */
 
-void mesh_ui_journal_ring_init(struct mesh_ui_journal_ring *ring, void *entries, size_t size,
-                               uint32_t capacity) {
+void inkstand_journal_ring_init(struct inkstand_journal_ring *ring, void *entries, size_t size,
+                                uint32_t capacity) {
     if (ring == NULL) {
         return;
     }
@@ -380,7 +380,7 @@ void mesh_ui_journal_ring_init(struct mesh_ui_journal_ring *ring, void *entries,
     ring->capacity = (entries == NULL || size == 0U) ? 0U : capacity;
 }
 
-void *mesh_ui_journal_ring_push(struct mesh_ui_journal_ring *ring) {
+void *inkstand_journal_ring_push(struct inkstand_journal_ring *ring) {
     if (ring == NULL || ring->capacity == 0U) {
         return NULL;
     }
@@ -395,15 +395,15 @@ void *mesh_ui_journal_ring_push(struct mesh_ui_journal_ring *ring) {
     return slot;
 }
 
-uint32_t mesh_ui_journal_ring_held(const struct mesh_ui_journal_ring *ring) {
+uint32_t inkstand_journal_ring_held(const struct inkstand_journal_ring *ring) {
     if (ring == NULL) {
         return 0U;
     }
     return ring->wrapped ? ring->capacity : ring->next;
 }
 
-void *mesh_ui_journal_ring_at(const struct mesh_ui_journal_ring *ring, uint32_t i) {
-    if (i >= mesh_ui_journal_ring_held(ring)) {
+void *inkstand_journal_ring_at(const struct inkstand_journal_ring *ring, uint32_t i) {
+    if (i >= inkstand_journal_ring_held(ring)) {
         return NULL;
     }
     return ring->entries + (size_t)i * ring->size;
@@ -419,14 +419,14 @@ static void journal_ring_swap(unsigned char *a, unsigned char *b, size_t size) {
     }
 }
 
-static void journal_ring_reverse(struct mesh_ui_journal_ring *ring, uint32_t lo, uint32_t hi) {
+static void journal_ring_reverse(struct inkstand_journal_ring *ring, uint32_t lo, uint32_t hi) {
     for (; lo + 1U < hi; ++lo, --hi) {
         journal_ring_swap(ring->entries + (size_t)lo * ring->size,
                           ring->entries + (size_t)(hi - 1U) * ring->size, ring->size);
     }
 }
 
-uint32_t mesh_ui_journal_ring_finish(struct mesh_ui_journal_ring *ring) {
+uint32_t inkstand_journal_ring_finish(struct inkstand_journal_ring *ring) {
     if (ring == NULL) {
         return 0U;
     }

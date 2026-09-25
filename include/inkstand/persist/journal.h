@@ -1,5 +1,4 @@
-#ifndef MESH_UI_STORE_JOURNAL_H
-#define MESH_UI_STORE_JOURNAL_H
+#pragma once
 
 /*
  * An append-only journal per subject: a directory of line-record files, one per subject, each
@@ -54,25 +53,25 @@ extern "C" {
 
 /* The longest directory a journal will live in, its terminator included. A longer one disables
    the journal rather than writing to a truncated path somewhere the caller did not ask for. */
-#define MESH_UI_JOURNAL_DIR_MAX 512U
+#define INKSTAND_JOURNAL_DIR_MAX 512U
 
 /* The longest file suffix, terminator included - ".log", ".trend". */
-#define MESH_UI_JOURNAL_SUFFIX_MAX 16U
+#define INKSTAND_JOURNAL_SUFFIX_MAX 16U
 
 /* The longest subject name, terminator included. */
-#define MESH_UI_JOURNAL_SUBJECT_MAX 64U
+#define INKSTAND_JOURNAL_SUBJECT_MAX 64U
 
 /* The longest path any call builds: the directory, a separator, a subject, the suffix and the
-   ".tmp" a rewrite goes through. A caller sizing a buffer for mesh_ui_journal_path() uses it. */
-#define MESH_UI_JOURNAL_PATH_MAX                                                                   \
-    (MESH_UI_JOURNAL_DIR_MAX + MESH_UI_JOURNAL_SUBJECT_MAX + MESH_UI_JOURNAL_SUFFIX_MAX + 8U)
+   ".tmp" a rewrite goes through. A caller sizing a buffer for inkstand_journal_path() uses it. */
+#define INKSTAND_JOURNAL_PATH_MAX                                                                  \
+    (INKSTAND_JOURNAL_DIR_MAX + INKSTAND_JOURNAL_SUBJECT_MAX + INKSTAND_JOURNAL_SUFFIX_MAX + 8U)
 
-struct mesh_ui_journal {
+struct inkstand_journal {
     /* With no trailing slash. Empty is a disabled journal. */
-    char dir[MESH_UI_JOURNAL_DIR_MAX];
+    char dir[INKSTAND_JOURNAL_DIR_MAX];
     /* What every file here ends in, so a wipe can tell this journal's files from anything else
        that ends up in the directory. */
-    char suffix[MESH_UI_JOURNAL_SUFFIX_MAX];
+    char suffix[INKSTAND_JOURNAL_SUFFIX_MAX];
     /* The size past which an append reports the file over its cap. 0 is uncapped. */
     uint64_t max_bytes;
 };
@@ -84,20 +83,20 @@ struct mesh_ui_journal {
  * returned: -EINVAL for an empty directory or a suffix that is not a plain word after its dot,
  * -ENAMETOOLONG for a directory or suffix longer than the limits above, or the errno making the
  * directory failed with. A caller that only wants to know whether it has somewhere to write asks
- * mesh_ui_journal_enabled() afterwards.
+ * inkstand_journal_enabled() afterwards.
  */
-int mesh_ui_journal_init(struct mesh_ui_journal *journal, const char *dir, const char *suffix,
-                         uint64_t max_bytes);
+int inkstand_journal_init(struct inkstand_journal *journal, const char *dir, const char *suffix,
+                          uint64_t max_bytes);
 
-bool mesh_ui_journal_enabled(const struct mesh_ui_journal *journal);
+bool inkstand_journal_enabled(const struct inkstand_journal *journal);
 
 /* Where `subject`'s file is. 0, -EINVAL for a subject that is not a plain word, -ENOENT for a
    disabled journal, or -ENAMETOOLONG when `out` is too short. */
-int mesh_ui_journal_path(const struct mesh_ui_journal *journal, const char *subject, char *out,
-                         size_t out_len);
+int inkstand_journal_path(const struct inkstand_journal *journal, const char *subject, char *out,
+                          size_t out_len);
 
 /* Whether `subject` has a file yet. False for a disabled journal or a bad name. */
-bool mesh_ui_journal_exists(const struct mesh_ui_journal *journal, const char *subject);
+bool inkstand_journal_exists(const struct inkstand_journal *journal, const char *subject);
 
 /*
  * Appends to `subject`'s file through `write`, creating it if it is not there.
@@ -113,10 +112,10 @@ bool mesh_ui_journal_exists(const struct mesh_ui_journal *journal, const char *s
  * inkwell_record_append()'s does, and a failed append is one the caller should not remember as
  * written: the next attempt writes it again.
  */
-typedef void (*mesh_ui_journal_append_fn)(FILE *file, bool resumed, void *context);
+typedef void (*inkstand_journal_append_fn)(FILE *file, bool resumed, void *context);
 
-int mesh_ui_journal_append(const struct mesh_ui_journal *journal, const char *subject,
-                           mesh_ui_journal_append_fn write, void *context, bool *out_over_cap);
+int inkstand_journal_append(const struct inkstand_journal *journal, const char *subject,
+                            inkstand_journal_append_fn write, void *context, bool *out_over_cap);
 
 /*
  * One pass over `subject`'s file, a decoded key and value at a time - inkwell_record_read()'s
@@ -125,14 +124,14 @@ int mesh_ui_journal_append(const struct mesh_ui_journal *journal, const char *su
  *
  * 0, -ENOENT when there is no file (or the journal is disabled), or another negative errno.
  */
-int mesh_ui_journal_read(const struct mesh_ui_journal *journal, const char *subject, char *line,
-                         size_t capacity, inkwell_record_visit_fn visit, void *context);
+int inkstand_journal_read(const struct inkstand_journal *journal, const char *subject, char *line,
+                          size_t capacity, inkwell_record_visit_fn visit, void *context);
 
 /* Replaces `subject`'s file with what `write` writes, through a temporary beside it, so a reader
    sees the old file or the new one and an interrupted rewrite leaves the old. 0 or a negative
    errno; 0 without calling `write` for a disabled journal. */
-int mesh_ui_journal_replace(const struct mesh_ui_journal *journal, const char *subject,
-                            inkwell_record_write_fn write, void *context);
+int inkstand_journal_replace(const struct inkstand_journal *journal, const char *subject,
+                             inkwell_record_write_fn write, void *context);
 
 /*
  * Streams `subject`'s file through a filter into a replacement, for a change to a file too large
@@ -149,19 +148,19 @@ int mesh_ui_journal_replace(const struct mesh_ui_journal *journal, const char *s
  * Returns that count. 0 leaves the file exactly as it was - a filter that found nothing to do
  * must not rewrite it. -ENOENT is never returned: a subject with no file has nothing to drop.
  */
-typedef void (*mesh_ui_journal_filter_fn)(void *context, const char *line, FILE *out);
-typedef uint32_t (*mesh_ui_journal_filter_end_fn)(void *context, FILE *out);
+typedef void (*inkstand_journal_filter_fn)(void *context, const char *line, FILE *out);
+typedef uint32_t (*inkstand_journal_filter_end_fn)(void *context, FILE *out);
 
-int mesh_ui_journal_filter(const struct mesh_ui_journal *journal, const char *subject, char *line,
-                           size_t capacity, mesh_ui_journal_filter_fn filter,
-                           mesh_ui_journal_filter_end_fn end, void *context);
+int inkstand_journal_filter(const struct inkstand_journal *journal, const char *subject, char *line,
+                            size_t capacity, inkstand_journal_filter_fn filter,
+                            inkstand_journal_filter_end_fn end, void *context);
 
 /* Removes `subject`'s file. 0 when it is gone, including when it never existed. */
-int mesh_ui_journal_forget(const struct mesh_ui_journal *journal, const char *subject);
+int inkstand_journal_forget(const struct inkstand_journal *journal, const char *subject);
 
 /* Removes every file this journal wrote, and any temporary an interrupted rewrite left beside
    one. Returns how many subjects' files were removed, or a negative errno. */
-int mesh_ui_journal_forget_all(const struct mesh_ui_journal *journal);
+int inkstand_journal_forget_all(const struct inkstand_journal *journal);
 
 /*
  * The newest `capacity` records of a file, in a caller's buffer.
@@ -176,7 +175,7 @@ int mesh_ui_journal_forget_all(const struct mesh_ui_journal *journal);
  * there is more behind the oldest one it holds. It is counted as a slot is taken, not as the ring
  * wraps: the record that *fills* the last slot has pushed nothing out.
  */
-struct mesh_ui_journal_ring {
+struct inkstand_journal_ring {
     unsigned char *entries;
     size_t size;
     uint32_t capacity;
@@ -186,24 +185,22 @@ struct mesh_ui_journal_ring {
     bool wrapped;
 };
 
-void mesh_ui_journal_ring_init(struct mesh_ui_journal_ring *ring, void *entries, size_t size,
-                               uint32_t capacity);
+void inkstand_journal_ring_init(struct inkstand_journal_ring *ring, void *entries, size_t size,
+                                uint32_t capacity);
 
 /* The slot the next record goes in - the oldest one once the ring is full. Never NULL for a ring
    with a capacity. The caller fills it. */
-void *mesh_ui_journal_ring_push(struct mesh_ui_journal_ring *ring);
+void *inkstand_journal_ring_push(struct inkstand_journal_ring *ring);
 
 /* How many slots hold a record, and slot `i` of them in storage order - not transcript order,
-   until mesh_ui_journal_ring_finish() has run. For a reader that folds a record it has seen
+   until inkstand_journal_ring_finish() has run. For a reader that folds a record it has seen
    before into the slot it already holds. */
-uint32_t mesh_ui_journal_ring_held(const struct mesh_ui_journal_ring *ring);
-void *mesh_ui_journal_ring_at(const struct mesh_ui_journal_ring *ring, uint32_t i);
+uint32_t inkstand_journal_ring_held(const struct inkstand_journal_ring *ring);
+void *inkstand_journal_ring_at(const struct inkstand_journal_ring *ring, uint32_t i);
 
 /* Rotates the buffer oldest-first, in place, and returns how many records it holds. */
-uint32_t mesh_ui_journal_ring_finish(struct mesh_ui_journal_ring *ring);
+uint32_t inkstand_journal_ring_finish(struct inkstand_journal_ring *ring);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* MESH_UI_STORE_JOURNAL_H */
