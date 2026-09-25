@@ -215,7 +215,7 @@ conversation) and each other's key tables.
   migration of a file from before the lists existed - and which devices and which transports the
   two lists hold.
 
-### 4. The form model and codec - in progress
+### 4. The form model and codec - in part
 
 `src/ui/settings/settings_codec.c` (324 lines) is already nearly a leaf: text to value and back
 for decimals, numbers and keys, over inkwell's `text.h` and `base64.h`. It comes first and
@@ -288,16 +288,44 @@ one.
   `key_len_ok()`, the formatters and zero-words, and every `mesh_ui_settings_*` accessor as the
   one-line call into this descriptor.
 
-**Next:** pending edits (`form/edits.h`) - the buffer of changed values, set-or-drop-if-base,
-and the drop by commit group that `store.c` does - then the row model.
+**Not yet:** pending edits and the row model. Pending edits are about seventy lines of array
+work - find, set or append, remove, clear, drop by commit group - over a record whose text buffer
+is sized by the application's field list, and bringing them down means describing that record
+through a stride, a text offset and a text size: more plumbing than logic. The row model is the
+builder primitives under `settings_rows.c`, which want the words a row prints (on, off, empty,
+secret) passed in as ids. Both stay in mesh-client until something else needs them, and step 5
+went first.
 
-### 5. The overlays
+### 5. The overlays - in progress
 
 The toast queue, the confirm dialog, the keyboard session and help, out of `src/ui/nav/nav.c`
 (2,893 lines) and `nav_keyboard.c` (598). These are the first pieces of `nav/` and can move
 before the stack does, as services the flat nav calls.
 
 **Stays behind:** the seven jobs mesh-client opens the keyboard for, and its emoji pages.
+
+**5a. The snackbar's queue - done.** The one overlay that named nothing but itself.
+
+- **Moved:** `include/inkstand/nav/toast.h` and `src/nav/toast.c`: one notice showing, its
+  deadline, and three waiting behind it, as a plain struct an application embeds in its nav - so
+  a snapshot is still a copy. Set and raise for a press, which replaces what is showing; post for
+  an arrival, which waits its turn; dismiss for a press that takes one down; date for the clock a
+  press did not have; and tick. The seam was made in mesh-client first, as `toast.{c,h}` under
+  `nav.c`, after a fix in its own commit: a press used to clear the notice and strand the queue
+  behind it, which the tick then never walked, so the next arrival jumped ahead of it.
+- **Decided on the way:** the toast is view state and lives in `nav/`, not `state/`: posting is a
+  direct call the store makes, not an action, until step 6 says otherwise. The limits (64 bytes,
+  three waiting, four seconds) are inkstand's constants, not an application's to override - a
+  library and an application compiled with different ones would disagree about the struct.
+- **Tests:** `tests/suites/nav_toast.c`. The queue case came from mesh-client whole and the
+  expiry and dismiss rules sliced out of its navigation case; the undated path is new.
+- **Stayed behind:** every sentence a notice says, which press sets one and which arrival posts
+  one, the dating after a press in `mesh_ui_store_handle_key()`, the store's dirty flag, and
+  `mesh_ui_nav_*_toast` as the one-line calls into this.
+
+**Next:** the confirm dialog - open, a cursor that starts on Cancel, and a key that answers
+accepted, cancelled or moved - with what accepting *does* left to the application. Help and the
+keyboard session wait for step 7: both decide which screen to return to.
 
 ### 6. The store, and effects
 
