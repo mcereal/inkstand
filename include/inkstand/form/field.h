@@ -1,5 +1,4 @@
-#ifndef MESH_UI_FORM_FIELD_H
-#define MESH_UI_FORM_FIELD_H
+#pragma once
 
 /*
  * One row of a form, described: what it is called, what kind of row it is, which section it sits
@@ -40,9 +39,9 @@
 extern "C" {
 #endif
 
-enum mesh_ui_setting_kind {
-    MESH_UI_SETTING_INFO = 0, /* a read-only fact */
-    MESH_UI_SETTING_TOGGLE,
+enum inkstand_form_kind {
+    INKSTAND_FORM_INFO = 0, /* a read-only fact */
+    INKSTAND_FORM_TOGGLE,
     /*
      * A boolean that is one *bit* of a larger value, rather than a value of its own.
      *
@@ -57,12 +56,12 @@ enum mesh_ui_setting_kind {
      * on. A flag is one of a set, and the set is only readable as a set. That is the checkbox: a
      * square is "any of these" where a circle is "one of these".
      */
-    MESH_UI_SETTING_FLAG,
-    MESH_UI_SETTING_ENUM,
-    MESH_UI_SETTING_TEXT,
-    MESH_UI_SETTING_NUMBER,
-    MESH_UI_SETTING_KEY,
-    MESH_UI_SETTING_ACTION,
+    INKSTAND_FORM_FLAG,
+    INKSTAND_FORM_ENUM,
+    INKSTAND_FORM_TEXT,
+    INKSTAND_FORM_NUMBER,
+    INKSTAND_FORM_KEY,
+    INKSTAND_FORM_ACTION,
     /*
      * A verb that cannot be pressed right now, and why - "not connected", "not supported",
      * "nothing to drop".
@@ -79,24 +78,24 @@ enum mesh_ui_setting_kind {
      * construction; spelled as `action + disabled` it would be refused only by everywhere that
      * remembered to ask.
      */
-    MESH_UI_SETTING_ACTION_OFF,
+    INKSTAND_FORM_ACTION_OFF,
     /* A group title inside a long section: dimmed, no value column, and a press on it does
        nothing. A heading is never added or removed by an edit - a row count that moves under the
        cursor mid-edit moves the cursor. */
-    MESH_UI_SETTING_HEADING,
+    INKSTAND_FORM_HEADING,
     /*
      * A read-only quantity whose *level* is the point: how far a download has got, how much of
-     * something is used up. The row's number is permille, or MESH_UI_METER_UNKNOWN while work is
-     * happening whose extent cannot be known.
+     * something is used up. The row's number is permille, or INKSTAND_FORM_METER_UNKNOWN while work
+     * is happening whose extent cannot be known.
      *
      * The row's words carry the same fact, and that is deliberate rather than redundant: a
      * backend that cannot draw a bar shows it as an ordinary fact and loses nothing.
      */
-    MESH_UI_SETTING_METER,
+    INKSTAND_FORM_METER,
 };
 
-/* MESH_UI_SETTING_METER: the number for a step that is running with no fraction to report. */
-#define MESH_UI_METER_UNKNOWN UINT32_MAX
+/* INKSTAND_FORM_METER: the number for a step that is running with no fraction to report. */
+#define INKSTAND_FORM_METER_UNKNOWN UINT32_MAX
 
 /*
  * One field. The application's row struct starts with one of these; see the header.
@@ -106,9 +105,9 @@ enum mesh_ui_setting_kind {
  * it. `note` is last for that reason, and every row states it, INKCELL_STR_NONE included - which
  * is what turns a renumbering into a type error somewhere rather than a silence everywhere.
  */
-struct mesh_ui_form_field {
+struct inkstand_form_field {
     inkcell_str_id label;
-    enum mesh_ui_setting_kind kind;
+    enum inkstand_form_kind kind;
     /* The application's section id. The form compares it and never interprets it. */
     uint16_t section;
     /*
@@ -136,41 +135,40 @@ struct mesh_ui_form_field {
  * A form: the application's table, read through a stride.
  *
  * `fields` is `count` rows of `stride` bytes each, and each row begins with a
- * struct mesh_ui_form_field. Row 0 is no field.
+ * struct inkstand_form_field. Row 0 is no field.
  */
-struct mesh_ui_form {
+struct inkstand_form {
     const void *fields;
     size_t stride;
     uint16_t count;
 };
 
 /* The row for `id`, never NULL: an id at or past `count` is row 0. */
-const struct mesh_ui_form_field *mesh_ui_form_field(const struct mesh_ui_form *form, uint16_t id);
+const struct inkstand_form_field *inkstand_form_field(const struct inkstand_form *form,
+                                                      uint16_t id);
 
 /* Whether any row but row 0 sits in `section`. A walk rather than a column, so a section whose
    last row is retired stops answering true without anybody remembering to say so. */
-bool mesh_ui_form_section_has_fields(const struct mesh_ui_form *form, uint16_t section);
+bool inkstand_form_section_has_fields(const struct inkstand_form *form, uint16_t section);
 
 /* FLAG: which bit of its group's word the row is, and 0 for every other kind. */
-uint32_t mesh_ui_form_bit(const struct mesh_ui_form *form, uint16_t id);
+uint32_t inkstand_form_bit(const struct inkstand_form *form, uint16_t id);
 /* ENUM: how many values, and 0 for every other kind. */
-uint32_t mesh_ui_form_enum_count(const struct mesh_ui_form *form, uint16_t id);
+uint32_t inkstand_form_enum_count(const struct inkstand_form *form, uint16_t id);
 /* ENUM: the name of `value`, or inkcell's word for "unknown" for any other kind or a row with no
    names. Never NULL. */
-const char *mesh_ui_form_enum_name(const struct mesh_ui_form *form, uint16_t id, uint32_t value);
+const char *inkstand_form_enum_name(const struct inkstand_form *form, uint16_t id, uint32_t value);
 /* TEXT and KEY: the longest value in bytes, without the NUL; 0 for every other kind. */
-uint32_t mesh_ui_form_text_max(const struct mesh_ui_form *form, uint16_t id);
+uint32_t inkstand_form_text_max(const struct inkstand_form *form, uint16_t id);
 /* KEY: the choices Left and Right walk; 0 for every other kind. */
-uint32_t mesh_ui_form_key_choices(const struct mesh_ui_form *form, uint16_t id);
+uint32_t inkstand_form_key_choices(const struct inkstand_form *form, uint16_t id);
 /* NUMBER: inkstand_form_presets_step() over the row's presets, and `value` for any other kind. */
-uint32_t mesh_ui_form_number_step(const struct mesh_ui_form *form, uint16_t id, uint32_t value,
-                                  int delta);
+uint32_t inkstand_form_number_step(const struct inkstand_form *form, uint16_t id, uint32_t value,
+                                   int delta);
 /* NUMBER: inkstand_form_presets_track() over the row's presets, and false for any other kind. */
-bool mesh_ui_form_number_track(const struct mesh_ui_form *form, uint16_t id, uint32_t value,
-                               struct inkstand_form_track *out);
+bool inkstand_form_number_track(const struct inkstand_form *form, uint16_t id, uint32_t value,
+                                struct inkstand_form_track *out);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
