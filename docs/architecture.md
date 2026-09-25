@@ -117,7 +117,9 @@ value round-trips through text by a codec that must parse exactly what it prints
 Meshtastic fields are data over that mechanism. The mechanism comes here as `form/`; the fields
 stay behind as a `.def`. The codec came first, as `form/codec.h`: the parse and the print for
 a decimal, an identifier and a run of bytes, with the spellings that are an application's own -
-a marker, the sizes a key is read as hex at - passed in rather than known.
+a marker, the sizes a key is read as hex at - passed in rather than known. The number scale followed as
+`form/scale.h`: a row's presets and whether they measure or name, and the walk a choice row
+makes through a set.
 
 ### 6. Persistence has two shapes
 
