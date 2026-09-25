@@ -4,18 +4,18 @@
 #include <limits.h>
 #include <string.h>
 
-static unsigned char *slot(const struct mesh_ui_recent *list, size_t index) {
+static unsigned char *slot(const struct inkstand_recent *list, size_t index) {
     return (unsigned char *)list->entries + index * list->size;
 }
 
-static bool same(const struct mesh_ui_recent *list, const void *entry, const void *wanted) {
+static bool same(const struct inkstand_recent *list, const void *entry, const void *wanted) {
     return list->same != NULL ? list->same(entry, wanted, list->context)
                               : memcmp(entry, wanted, list->size) == 0;
 }
 
 /* A count past the array is a record written by something else, or a byte that went bad on the
    card; either way no index at or past the capacity is ever read. */
-static void clamp(struct mesh_ui_recent *list) {
+static void clamp(struct inkstand_recent *list) {
     if (list->count > list->capacity) {
         list->count = list->capacity;
     }
@@ -23,7 +23,7 @@ static void clamp(struct mesh_ui_recent *list) {
 
 /* The rank among the first `count` entries only, which is what a parse asks while the entry it
    is testing sits in the slot just past them. */
-static int rank_within(const struct mesh_ui_recent *list, size_t count, const void *wanted) {
+static int rank_within(const struct inkstand_recent *list, size_t count, const void *wanted) {
     for (size_t i = 0; i < count; ++i) {
         if (same(list, slot(list, i), wanted)) {
             return (int)i;
@@ -32,9 +32,9 @@ static int rank_within(const struct mesh_ui_recent *list, size_t count, const vo
     return -1;
 }
 
-int mesh_ui_recent_init(struct mesh_ui_recent *list, void *entries, size_t size, size_t capacity,
-                        size_t count, mesh_ui_recent_same_fn same_fn, void *context) {
-    if (list == NULL || entries == NULL || size == 0U || size > MESH_UI_RECENT_ENTRY_MAX ||
+int inkstand_recent_init(struct inkstand_recent *list, void *entries, size_t size, size_t capacity,
+                         size_t count, inkstand_recent_same_fn same_fn, void *context) {
+    if (list == NULL || entries == NULL || size == 0U || size > INKSTAND_RECENT_ENTRY_MAX ||
         capacity == 0U || capacity > (size_t)INT_MAX) {
         return -EINVAL;
     }
@@ -48,7 +48,7 @@ int mesh_ui_recent_init(struct mesh_ui_recent *list, void *entries, size_t size,
     return 0;
 }
 
-int mesh_ui_recent_rank(const struct mesh_ui_recent *list, const void *wanted) {
+int inkstand_recent_rank(const struct inkstand_recent *list, const void *wanted) {
     if (list == NULL || list->entries == NULL || wanted == NULL) {
         return -1;
     }
@@ -56,7 +56,7 @@ int mesh_ui_recent_rank(const struct mesh_ui_recent *list, const void *wanted) {
     return rank_within(list, count, wanted);
 }
 
-bool mesh_ui_recent_note(struct mesh_ui_recent *list, const void *entry) {
+bool inkstand_recent_note(struct inkstand_recent *list, const void *entry) {
     if (list == NULL || list->entries == NULL || entry == NULL) {
         return false;
     }
@@ -67,7 +67,7 @@ bool mesh_ui_recent_note(struct mesh_ui_recent *list, const void *entry) {
 
     /* By value before anything moves: the entry may well point into the list this is about to
        shift, and the copy into the head below would then read whatever slid into its place. */
-    unsigned char wanted[MESH_UI_RECENT_ENTRY_MAX];
+    unsigned char wanted[INKSTAND_RECENT_ENTRY_MAX];
     memcpy(wanted, entry, list->size);
 
     /* Slide everything ahead of the existing entry down by one and put this one in front. One not
@@ -89,7 +89,7 @@ bool mesh_ui_recent_note(struct mesh_ui_recent *list, const void *entry) {
     return true;
 }
 
-bool mesh_ui_recent_forget(struct mesh_ui_recent *list, const void *wanted) {
+bool inkstand_recent_forget(struct inkstand_recent *list, const void *wanted) {
     if (list == NULL || list->entries == NULL || wanted == NULL) {
         return false;
     }
@@ -107,8 +107,8 @@ bool mesh_ui_recent_forget(struct mesh_ui_recent *list, const void *wanted) {
     return true;
 }
 
-int mesh_ui_recent_write(const struct mesh_ui_recent *list, FILE *out, char separator,
-                         mesh_ui_recent_write_fn write, void *context) {
+int inkstand_recent_write(const struct inkstand_recent *list, FILE *out, char separator,
+                          inkstand_recent_write_fn write, void *context) {
     if (list == NULL || list->entries == NULL || out == NULL || write == NULL) {
         return -EINVAL;
     }
@@ -125,8 +125,8 @@ int mesh_ui_recent_write(const struct mesh_ui_recent *list, FILE *out, char sepa
     return 0;
 }
 
-size_t mesh_ui_recent_parse(struct mesh_ui_recent *list, const char *text, char separator,
-                            mesh_ui_recent_parse_fn parse, void *context) {
+size_t inkstand_recent_parse(struct inkstand_recent *list, const char *text, char separator,
+                             inkstand_recent_parse_fn parse, void *context) {
     if (list == NULL || list->entries == NULL) {
         return 0U;
     }
