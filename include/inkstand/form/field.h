@@ -155,8 +155,9 @@ bool inkstand_form_section_has_fields(const struct inkstand_form *form, uint16_t
 uint32_t inkstand_form_bit(const struct inkstand_form *form, uint16_t id);
 /* ENUM: how many values, and 0 for every other kind. */
 uint32_t inkstand_form_enum_count(const struct inkstand_form *form, uint16_t id);
-/* ENUM: the name of `value`, or inkcell's word for "unknown" for any other kind or a row with no
-   names. Never NULL. */
+/* ENUM: the name of `value`, or inkcell's word for "unknown" for any other kind, a row with no
+   names, or a value its names callback answers NULL for. Never NULL. The name is text the
+   application has already translated - some are proper names with no catalog entry. */
 const char *inkstand_form_enum_name(const struct inkstand_form *form, uint16_t id, uint32_t value);
 /* TEXT and KEY: the longest value in bytes, without the NUL; 0 for every other kind. */
 uint32_t inkstand_form_text_max(const struct inkstand_form *form, uint16_t id);

@@ -38,10 +38,14 @@ uint32_t inkstand_form_enum_count(const struct inkstand_form *form, uint16_t id)
 
 const char *inkstand_form_enum_name(const struct inkstand_form *form, uint16_t id, uint32_t value) {
     const struct inkstand_form_field *field = inkstand_form_field(form, id);
-    if (field->kind != INKSTAND_FORM_ENUM || field->enum_name == NULL) {
-        return inkcell_str(INKCELL_STR_COMMON_UNKNOWN_SHORT);
+    const char *name = NULL;
+    if (field->kind == INKSTAND_FORM_ENUM && field->enum_name != NULL) {
+        name = field->enum_name(value);
     }
-    return field->enum_name(value);
+    /* The callback is the application's and may have no name for a value - one a newer peer
+       sent, or one past the end of its own list. The promise here is never NULL, so a caller
+       drawing the row never has to ask. */
+    return name != NULL ? name : inkcell_str(INKCELL_STR_COMMON_UNKNOWN_SHORT);
 }
 
 /*

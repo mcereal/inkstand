@@ -27,7 +27,7 @@ enum { SECTION_NONE = 0, SECTION_A = 1, SECTION_B = 2, SECTION_EMPTY = 3 };
 enum {
     F_NONE = 0,
     F_NAME,
-    F_ROLE,
+    F_SHAPE,
     F_INTERVAL,
     F_PIN,
     F_FLAG_LOW,
@@ -37,9 +37,10 @@ enum {
     F_COUNT,
 };
 
-static const char *role_name(uint32_t value) {
-    static const char *const k_names[] = {"client", "router", "repeater"};
-    return value < LEN(k_names) ? k_names[value] : "?";
+/* Answers NULL past its list, as an application's callback may for a value it does not know. */
+static const char *shape_name(uint32_t value) {
+    static const char *const k_names[] = {"circle", "square", "triangle"};
+    return value < LEN(k_names) ? k_names[value] : NULL;
 }
 
 static const uint32_t k_intervals[] = {0U, 10U, 30U, 60U};
@@ -57,8 +58,8 @@ static const struct app_row k_rows[F_COUNT] = {
     [F_NONE] = {{0, INKSTAND_FORM_INFO, SECTION_NONE, 0U, NULL, {NULL, 0U, false, false}, 0U, 0},
                 0xDEADU},
     [F_NAME] = {{1, INKSTAND_FORM_TEXT, SECTION_A, 39U, NULL, {NULL, 0U, false, false}, 0U, 0}, 1U},
-    [F_ROLE] = {{2, INKSTAND_FORM_ENUM, SECTION_A, 3U, role_name, {NULL, 0U, false, false}, 0U, 7},
-                2U},
+    [F_SHAPE] =
+        {{2, INKSTAND_FORM_ENUM, SECTION_A, 3U, shape_name, {NULL, 0U, false, false}, 0U, 7}, 2U},
     [F_INTERVAL] = {{3,
                      INKSTAND_FORM_NUMBER,
                      SECTION_A,
@@ -118,7 +119,7 @@ INKSTAND_TEST_CASE(form_field_resolves_an_unknown_id_to_row_zero, unit) {
 /* Each question is about one kind, and every other kind answers it with nothing - including a
    row whose `limit` means something else. */
 INKSTAND_TEST_CASE(form_field_answers_each_question_only_for_its_own_kind, unit) {
-    INKSTAND_TEST_FAIL_IF(inkstand_form_enum_count(&k_form, F_ROLE) != 3U ||
+    INKSTAND_TEST_FAIL_IF(inkstand_form_enum_count(&k_form, F_SHAPE) != 3U ||
                               inkstand_form_enum_count(&k_form, F_NAME) != 0U ||
                               inkstand_form_enum_count(&k_form, F_FLAG_HIGH) != 0U,
                           "only an ENUM row has a count of values");
@@ -126,14 +127,14 @@ INKSTAND_TEST_CASE(form_field_answers_each_question_only_for_its_own_kind, unit)
     INKSTAND_TEST_FAIL_IF(inkstand_form_bit(&k_form, F_FLAG_LOW) != (1U << 0) ||
                               inkstand_form_bit(&k_form, F_FLAG_HIGH) != (1U << 9),
                           "a FLAG row's limit is its bit");
-    INKSTAND_TEST_FAIL_IF(inkstand_form_bit(&k_form, F_ROLE) != 0U ||
+    INKSTAND_TEST_FAIL_IF(inkstand_form_bit(&k_form, F_SHAPE) != 0U ||
                               inkstand_form_bit(&k_form, F_NAME) != 0U,
                           "a limit on any other kind is not a bit");
 
     INKSTAND_TEST_FAIL_IF(inkstand_form_text_max(&k_form, F_NAME) != 39U ||
                               inkstand_form_text_max(&k_form, F_SECRET) != 64U,
                           "TEXT and KEY rows should answer their byte cap, unclamped");
-    INKSTAND_TEST_FAIL_IF(inkstand_form_text_max(&k_form, F_ROLE) != 0U,
+    INKSTAND_TEST_FAIL_IF(inkstand_form_text_max(&k_form, F_SHAPE) != 0U,
                           "an ENUM row's count is not a byte cap");
 
     INKSTAND_TEST_FAIL_IF(inkstand_form_key_choices(&k_form, F_SECRET) != 0x5U ||
@@ -143,12 +144,15 @@ INKSTAND_TEST_CASE(form_field_answers_each_question_only_for_its_own_kind, unit)
 }
 
 INKSTAND_TEST_CASE(form_field_names_enum_values_and_never_answers_null, unit) {
-    INKSTAND_TEST_FAIL_IF(strcmp(inkstand_form_enum_name(&k_form, F_ROLE, 1U), "router") != 0,
+    INKSTAND_TEST_FAIL_IF(strcmp(inkstand_form_enum_name(&k_form, F_SHAPE, 1U), "square") != 0,
                           "an ENUM row should name its values");
     const char *unknown = inkcell_str(INKCELL_STR_COMMON_UNKNOWN_SHORT);
     INKSTAND_TEST_FAIL_IF(inkstand_form_enum_name(&k_form, F_NAME, 0U) == NULL ||
                               strcmp(inkstand_form_enum_name(&k_form, F_NAME, 0U), unknown) != 0,
                           "any other kind should answer the word for unknown, not NULL");
+    INKSTAND_TEST_FAIL_IF(inkstand_form_enum_name(&k_form, F_SHAPE, 9U) == NULL ||
+                              strcmp(inkstand_form_enum_name(&k_form, F_SHAPE, 9U), unknown) != 0,
+                          "a value the callback has no name for should be unknown, not NULL");
     record_success(test_name);
 }
 
@@ -157,7 +161,7 @@ INKSTAND_TEST_CASE(form_field_steps_and_places_a_number_row_by_its_presets, unit
     INKSTAND_TEST_FAIL_IF(inkstand_form_number_step(&k_form, F_INTERVAL, 10U, +1) != 30U ||
                               inkstand_form_number_step(&k_form, F_PIN, 2U, -1) != 1U,
                           "a NUMBER row should step through its own presets");
-    INKSTAND_TEST_FAIL_IF(inkstand_form_number_step(&k_form, F_ROLE, 1U, +1) != 1U,
+    INKSTAND_TEST_FAIL_IF(inkstand_form_number_step(&k_form, F_SHAPE, 1U, +1) != 1U,
                           "any other kind should be left where it is");
 
     struct inkstand_form_track track;
@@ -166,7 +170,7 @@ INKSTAND_TEST_CASE(form_field_steps_and_places_a_number_row_by_its_presets, unit
                           "a NUMBER row whose presets are a scale should place a value");
     INKSTAND_TEST_FAIL_IF(inkstand_form_number_track(&k_form, F_PIN, 2U, &track),
                           "a NUMBER row whose presets name things is not a track");
-    INKSTAND_TEST_FAIL_IF(inkstand_form_number_track(&k_form, F_ROLE, 1U, &track),
+    INKSTAND_TEST_FAIL_IF(inkstand_form_number_track(&k_form, F_SHAPE, 1U, &track),
                           "any other kind is not a track");
     record_success(test_name);
 }
