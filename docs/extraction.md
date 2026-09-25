@@ -215,7 +215,7 @@ conversation) and each other's key tables.
   migration of a file from before the lists existed - and which devices and which transports the
   two lists hold.
 
-### 4. The form model and codec
+### 4. The form model and codec - in progress
 
 `src/ui/settings/settings_codec.c` (324 lines) is already nearly a leaf: text to value and back
 for decimals, numbers and keys, over inkwell's `text.h` and `base64.h`. It comes first and
@@ -226,6 +226,28 @@ The seam is the field table. `enum mesh_ui_setting_field` and its ~200 rows stay
 as a `.def`; `form/` reads a table of descriptors and never an enum it owns.
 
 **Stays behind:** every field, every section, every radio action, and what saving one means.
+
+**4a. The text codec - done.** `form/`'s first sources.
+
+- **Moved:** `include/inkstand/form/codec.h` and `src/form/codec.c`: a decimal held as a scaled
+  integer, a 32-bit identifier, and a run of bytes as hex or base64, each parsed and printed side
+  by side. The seam was made in mesh-client first, as `form_codec.{c,h}` under
+  `settings_codec.c`, because each of the three had a fact of the application baked into it: the
+  places a coordinate is held to, the `!` a node number is written with, and the three sizes a
+  key is read as hex at. The marker and the sizes are arguments now, and the places always were.
+- **Decided on the way:** the codec needs nothing of inkcell and could have been headless, but
+  it is filed where the plan put it, in `form/`, because nothing but a form parses what a person
+  typed into a row. If a headless program ever wants it, it moves to `persist/` or a `text/` of
+  its own without a caller changing.
+- **Tests:** `tests/suites/form_codec.c`. The decimal, identifier and key cases came from
+  mesh-client's settings suite, at the same widths and with the same refusals; the cases for the
+  marker and the sizes are new. That suite still runs there, over this codec, through
+  `settings_codec.c`.
+- **Stayed behind:** `settings_codec.c` itself, as the wrappers that supply this client's
+  spellings - `MESH_UI_COORD_DIGITS` and the coordinate pair, the `!` node number, the key sizes -
+  and every `mesh_ui_settings_*` entry point, so no caller in mesh-client changed.
+
+**Next:** the mechanism half of `settings.c` and `settings_rows.c`, over a table of descriptors.
 
 ### 5. The overlays
 
