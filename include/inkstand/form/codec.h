@@ -34,7 +34,7 @@ extern "C" {
  *
  * Narrower than held is rounded, not cut: the digit that decides is the first one dropped. A
  * value between -1 and 0 keeps its sign, which has nowhere else to live once the whole part is
- * zero. Shown wider than held is shown at held.
+ * zero. Shown wider than held is shown at held. Every int64_t prints, INT64_MIN included.
  */
 void inkstand_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t shown_digits,
                                 char *out, size_t out_len);
@@ -47,7 +47,8 @@ void inkstand_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t s
  * the person cannot see. Surrounding spaces and a leading sign are allowed; fewer places than
  * held are padded. Refused: an empty or bare-point row, trailing rubbish, a magnitude past
  * `limit_whole`, and a fraction finer than `digits` that is not zeros - a row taking "12.5" as
- * 12 is the same mistake made quietly.
+ * 12 is the same mistake made quietly. So is every call whose `limit_whole` is too large to
+ * scale by `digits` places inside an int64_t: that is a range no answer could be held in.
  */
 bool inkstand_form_decimal_parse(const char *text, uint32_t digits, int64_t limit_whole,
                                  int64_t *out_scaled);

@@ -1,11 +1,11 @@
 /*
  * The form codec: decimals, identifiers and bytes, as text and back.
  *
- * mesh-client's settings suite still holds its own spellings - a coordinate's seven places, the
- * "!" a node number carries, the three sizes a key is read as hex at - and runs over this codec
- * there. These are the cases for the half that came down, sliced from that suite and made to
- * name no application: the rounding, the refusals, the ambiguous identifier, the padding. The
- * cases for what became an argument - the marker, the hex sizes - are new.
+ * The first application's settings suite still holds its own spellings - the places it holds
+ * a position to, the marker its identifiers carry, the three sizes a key is read as hex at - and
+ * runs over this codec there. These are the cases for the half that came down, sliced from that
+ * suite and made to name no application: the rounding, the refusals, the ambiguous identifier, the
+ * padding. The cases for what became an argument - the marker, the hex sizes - are new.
  */
 #include "framework/inkstand_test.h"
 
@@ -75,6 +75,47 @@ INKSTAND_TEST_CASE(form_decimal_prints_rounded_and_keeps_a_small_sign, unit) {
     /* Shown wider than held is shown at held. */
     inkstand_form_decimal_text(125, 1U, 4U, text, sizeof text);
     INKSTAND_TEST_FAIL_IF(strcmp(text, "12.5") != 0, "shown wider than held should clamp to held");
+    record_success(test_name);
+}
+
+/* The ends of int64_t, where a negation or a rounding step used to leave the type. */
+INKSTAND_TEST_CASE(form_decimal_prints_the_whole_range, unit) {
+    char text[32];
+
+    inkstand_form_decimal_text(INT64_MIN, 0U, 0U, text, sizeof text);
+    INKSTAND_TEST_FAIL_IF(strcmp(text, "-9223372036854775808") != 0,
+                          "INT64_MIN has no int64_t magnitude, and should still print");
+    inkstand_form_decimal_text(INT64_MIN, 9U, 2U, text, sizeof text);
+    INKSTAND_TEST_FAIL_IF(strcmp(text, "-9223372036.85") != 0,
+                          "INT64_MIN narrowed should round its magnitude like any other");
+
+    /* 854775807 dropped rounds the last shown place up - the add that used to overflow. */
+    inkstand_form_decimal_text(INT64_MAX, 9U, 0U, text, sizeof text);
+    INKSTAND_TEST_FAIL_IF(strcmp(text, "9223372037") != 0,
+                          "INT64_MAX narrowed should round up without leaving the type");
+    inkstand_form_decimal_text(INT64_MAX, 2U, 2U, text, sizeof text);
+    INKSTAND_TEST_FAIL_IF(strcmp(text, "92233720368547758.07") != 0,
+                          "INT64_MAX at its own width should print every digit");
+    record_success(test_name);
+}
+
+/* A range that cannot be held once scaled is refused, not multiplied. */
+INKSTAND_TEST_CASE(form_decimal_refuses_a_limit_too_large_to_scale, unit) {
+    int64_t value = 0;
+
+    INKSTAND_TEST_FAIL_IF(
+        inkstand_form_decimal_parse("0", 9U, INT64_MAX, &value) ||
+            inkstand_form_decimal_parse("1", 1U, INT64_MAX / 10, &value),
+        "a limit that cannot be scaled should be refused, even for a small value");
+    const int64_t largest = INT64_MAX / 1000000000 - 1;
+    INKSTAND_TEST_FAIL_IF(!inkstand_form_decimal_parse("-9223372035", 9U, largest, &value) ||
+                              value != -9223372035000000000,
+                          "the largest limit that fits should still take the limit itself");
+    INKSTAND_TEST_FAIL_IF(inkstand_form_decimal_parse("9223372035.000000001", 9U, largest, &value),
+                          "a fraction past the limit should be refused, not overflow");
+    INKSTAND_TEST_FAIL_IF(!inkstand_form_decimal_parse("-42", 0U, INT64_MAX - 1, &value) ||
+                              value != -42,
+                          "with no places the limit may be almost the whole type");
     record_success(test_name);
 }
 

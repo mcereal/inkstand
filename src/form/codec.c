@@ -10,6 +10,7 @@
 #include "inkwell/codec/base64.h"
 
 #include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -36,19 +37,26 @@ void inkstand_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t s
     }
     /* Rounded off rather than truncated at the shown width: the digit that decides which way the
        last shown one goes is the first one dropped. */
-    const int64_t drop = decimal_scale(held_digits - shown_digits);
+    const uint64_t drop = (uint64_t)decimal_scale(held_digits - shown_digits);
     const bool negative = scaled < 0;
-    int64_t magnitude = negative ? -scaled : scaled;
-    magnitude = (magnitude + drop / 2) / drop;
-    const int64_t unit = decimal_scale(shown_digits);
-    const int64_t whole = magnitude / unit;
-    const int64_t fraction = magnitude % unit;
+    /* Unsigned from here on, so every int64_t has a magnitude: INT64_MIN negated is not an
+       int64_t, and a value near INT64_MAX plus half a dropped place is not one either. The
+       quotient and remainder round half up without ever adding to the value itself. */
+    uint64_t magnitude = negative ? 0U - (uint64_t)scaled : (uint64_t)scaled;
+    const uint64_t remainder = magnitude % drop;
+    magnitude /= drop;
+    if (remainder >= drop - drop / 2U && drop > 1U) {
+        ++magnitude;
+    }
+    const uint64_t unit = (uint64_t)decimal_scale(shown_digits);
+    const uint64_t whole = magnitude / unit;
+    const uint64_t fraction = magnitude % unit;
     const char *const sign = negative ? "-" : "";
     if (shown_digits == 0U) {
-        snprintf(out, out_len, "%s%lld", sign, (long long)whole);
+        snprintf(out, out_len, "%s%llu", sign, (unsigned long long)whole);
     } else {
-        snprintf(out, out_len, "%s%lld.%0*lld", sign, (long long)whole, (int)shown_digits,
-                 (long long)fraction);
+        snprintf(out, out_len, "%s%llu.%0*llu", sign, (unsigned long long)whole, (int)shown_digits,
+                 (unsigned long long)fraction);
     }
 }
 
@@ -56,6 +64,12 @@ bool inkstand_form_decimal_parse(const char *text, uint32_t digits, int64_t limi
                                  int64_t *out_scaled) {
     if (text == NULL || out_scaled == NULL || limit_whole <= 0 ||
         digits > INKSTAND_FORM_DECIMAL_DIGITS_MAX) {
+        return false;
+    }
+    /* A limit whose scaled form - and the fraction a value at the limit may carry past it - would
+       not fit in an int64_t is refused before anything is multiplied by it. Every multiply below
+       is then bounded: whole never exceeds the limit, and fraction is under one scale. */
+    if (limit_whole > INT64_MAX / decimal_scale(digits) - 1) {
         return false;
     }
     const char *p = text;
