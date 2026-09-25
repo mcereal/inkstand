@@ -40,6 +40,7 @@
 
 #include "inkcell/ui/key.h"
 #include "inkstand/nav/frame_scheduler.h"
+#include "inkwell/base/log.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -174,7 +175,7 @@ unsigned inkstand_scene_error_line(const struct inkstand_scene *scene);
 
 /* Records the reason and returns -EINVAL, so a verb can `return inkstand_scene_fail(...)`. */
 int inkstand_scene_fail(struct inkstand_scene *scene, const char *format, ...)
-    __attribute__((format(printf, 2, 3)));
+    __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 2, 3)));
 
 /* Splits off the next whitespace-delimited word, leaving *rest on what follows. NULL at the end. */
 char *inkstand_scene_word(char **rest);
