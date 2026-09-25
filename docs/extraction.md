@@ -136,7 +136,7 @@ mesh-client's screen order and focus ids, and `tab` needs to know that the shoul
 next tab" - until step 7 gives this side a screen list. `toast` stays until step 5 brings the
 overlays down.
 
-### 3. Persistence - in progress
+### 3. Persistence - done
 
 | File | Lines | What comes | What stays |
 |---|---|---|---|
@@ -195,8 +195,25 @@ conversation) and each other's key tables.
   re-delivered message, the delta chain and its restart seam, which conversation a message
   belongs to, the recent ring and the seed, the retention numbers and the suffixes.
 
-**Next:** `preferences.c` - a bounded most-recently-used list, persisted - is independent of
-both and can come any time.
+**3c. The recently-used list - done.** One list under both of the preferences' lists.
+
+- **Moved:** `include/inkstand/persist/recent.h` and `src/persist/recent.c`. The seam was made in
+  mesh-client first, as `store_recent.{c,h}` under `preferences.c`, which kept two lists - the
+  peers it had been connected to and the addresses it had reached them at - and wrote each by
+  hand. A list is a view over the caller's array and its count, so the record keeps the
+  `entries[8]` and count byte it always carried and nothing allocates. What an entry is, when
+  two are the same (an address that matches in either case, a transport that is part of the
+  name) and how one is spelled in the file are the caller's callbacks.
+- **Decided on the way:** a note copies its entry before anything moves, because the natural
+  call passes a pointer into the list it reorders - which is what bounds an entry at
+  `INKSTAND_RECENT_ENTRY_MAX`. A line is read in file order, not replayed through a note, and an
+  entry the parser refuses is skipped rather than ending the line.
+- **Tests:** `tests/suites/persist_recent.c`. The order, the bound and the round trip came from
+  mesh-client's preference suite; the rest is new. That suite still runs there, over this list,
+  and holds what the two lists mean.
+- **Stayed behind:** the preferences file itself - its keys, its path, every setting in it, the
+  migration of a file from before the lists existed - and which devices and which transports the
+  two lists hold.
 
 ### 4. The form model and codec
 
