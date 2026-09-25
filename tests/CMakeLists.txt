@@ -21,6 +21,7 @@ set(INKSTAND_TEST_UI_SUITES
     suites/form_field.c
     suites/form_scale.c
     suites/nav_frame_scheduler.c
+    suites/nav_toast.c
     suites/app_scene.c
 )
 # The control socket is a Unix socket, and so is its suite: it talks to one directly, through
