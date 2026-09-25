@@ -42,7 +42,7 @@ static void inkstand_control_run(struct inkstand_control *control);
 /* ---- the listening end -------------------------------------------------------------------- */
 
 static void inkstand_control_reply(struct inkstand_control *control, const char *format, ...)
-    __attribute__((format(printf, 2, 3)));
+    __attribute__((format(INKWELL_PRINTF_ARCHETYPE, 2, 3)));
 
 static void inkstand_control_reply(struct inkstand_control *control, const char *format, ...) {
     if (control->client_fd < 0) {
