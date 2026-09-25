@@ -115,7 +115,9 @@ kind (toggle, choice, number, text, decimal, key), a step and a track for number
 for text, a section and a group; edits are held as pending and committed as one action; a
 value round-trips through text by a codec that must parse exactly what it prints. The ~200
 Meshtastic fields are data over that mechanism. The mechanism comes here as `form/`; the fields
-stay behind as a `.def`.
+stay behind as a `.def`. The codec came first, as `form/codec.h`: the parse and the print for
+a decimal, an identifier and a run of bytes, with the spellings that are an application's own -
+a marker, the sizes a key is read as hex at - passed in rather than known.
 
 ### 6. Persistence has two shapes
 
