@@ -128,6 +128,10 @@ stay behind as a `.def`.
   conversation's history past the in-memory ring) and `store_trends.c` (a node's readings past
   one run) each built separately, and now share as `persist/journal.h`.
 
+Beside both sits a smaller thing, **a recently-used list** (`persist/recent.h`): the handful of
+things a program was last used with, newest first, bounded, and kept as one line of a settings
+file - the same move-to-front written twice over in mesh-client's preferences.
+
 Together they are roughly what `localStorage` and a small IndexedDB are to a web page, sized
 for an SD card.
 
