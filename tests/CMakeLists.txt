@@ -20,6 +20,7 @@ set(INKSTAND_TEST_UI_SUITES
     suites/form_codec.c
     suites/form_field.c
     suites/form_scale.c
+    suites/nav_dialog.c
     suites/nav_frame_scheduler.c
     suites/nav_toast.c
     suites/app_scene.c

@@ -323,10 +323,27 @@ before the stack does, as services the flat nav calls.
   one, the dating after a press in `mesh_ui_store_handle_key()`, the store's dirty flag, and
   `mesh_ui_nav_*_toast` as the one-line calls into this.
 
-**Next:** the confirm dialog - open, a cursor that starts on Cancel, and a key that answers
-accepted, cancelled or moved - with what accepting *does* left to the application. Help and the
-keyboard session wait for step 7: both decide which screen to return to.
+**5b. The two-answer dialog - done.** What every go-ahead-or-don't question has in common.
 
+- **Moved:** `include/inkstand/nav/dialog.h` and `src/nav/dialog.c`: `struct inkstand_dialog`
+  (open, the cursor, and a subject the dialog carries and never reads), opening on Cancel so a
+  repeated press changes nothing, and a key that answers moved, accepted or cancelled - and on an
+  answer closes, handing back what the question was about. The walk between the two answers is
+  resolved inside the dialog over the frame's focus map, so a row dimmed behind it can never be
+  where the cursor goes; before the dialog's first frame, any direction toggles. The seam was made
+  in mesh-client first, as `dialog.{c,h}` under its confirm sheet, whose three fields became one
+  `struct` on the nav.
+- **Decided on the way:** the dialog is the modal and not the question. mesh-client's verify
+  sheet has three stages and answers of its own, and takes only the walk; its confirm sheet takes
+  all of it and keeps what accepting *means* - the save, the radio action, the cursor a cleared
+  slot moves.
+- **Tests:** `tests/suites/nav_dialog.c`. Two cases came from mesh-client's capture suite over
+  hand-built maps; the layouts, the edge, and every answer a key gives are new.
+- **Stayed behind:** every question and its words, the four places that raise one, what each
+  accepted answer does, the verify sheet, and this client's focus ids for the answers.
+
+**Next:** help and the keyboard session wait for step 7: both decide which screen to return to,
+which is the router's question.
 ### 6. The store, and effects
 
 The publish-and-wake mechanism of `src/ui/store/store.c` (1,543 lines) is generic; its records

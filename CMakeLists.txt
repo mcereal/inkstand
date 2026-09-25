@@ -107,6 +107,7 @@ if(INKSTAND_WITH_UI)
         src/form/field.c
         src/form/scale.c
         # nav/ - where the reader is, and when a frame is drawn
+        src/nav/dialog.c
         src/nav/frame_scheduler.c
         src/nav/toast.c
         # app/ - the composition of the rest, and the socket that drives it from outside
