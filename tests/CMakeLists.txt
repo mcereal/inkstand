@@ -17,6 +17,7 @@ set(INKSTAND_TEST_CORE_SUITES
 
 # The half that draws: nav/, form/, app/.
 set(INKSTAND_TEST_UI_SUITES
+    suites/form_codec.c
     suites/nav_frame_scheduler.c
     suites/app_scene.c
 )
