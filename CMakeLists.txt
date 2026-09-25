@@ -75,6 +75,7 @@ endif()
 add_library(inkstand_core STATIC
     # persist/ - the records an application keeps on disk
     src/persist/fields.c
+    src/persist/journal.c
     src/persist/keys.c
 )
 target_include_directories(inkstand_core PUBLIC
