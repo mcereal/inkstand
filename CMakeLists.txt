@@ -108,6 +108,7 @@ if(INKSTAND_WITH_UI)
         src/form/scale.c
         # nav/ - where the reader is, and when a frame is drawn
         src/nav/frame_scheduler.c
+        src/nav/toast.c
         # app/ - the composition of the rest, and the socket that drives it from outside
         ${INKSTAND_CONTROL_SOURCE}
         src/app/scene.c
