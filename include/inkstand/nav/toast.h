@@ -1,5 +1,4 @@
-#ifndef MESH_UI_TOAST_H
-#define MESH_UI_TOAST_H
+#pragma once
 
 /*
  * A snackbar's notices: the one line on screen, how long it stands, and what is waiting behind it.
@@ -39,7 +38,7 @@ extern "C" {
 #endif
 
 /* The longest notice, terminator included. A longer one is cut to fit. */
-#define MESH_UI_TOAST_TEXT_MAX 64U
+#define INKSTAND_TOAST_TEXT_MAX 64U
 
 /*
  * Notices waiting behind the one on screen.
@@ -49,14 +48,14 @@ extern "C" {
  * nothing in a burst is simply lost, short enough that a notice is still about something that just
  * happened. A fourth would be news sixteen seconds old.
  */
-#define MESH_UI_TOAST_QUEUE 3U
+#define INKSTAND_TOAST_QUEUE 3U
 
 /* How long a notice stands, in the clock's milliseconds. */
-#define MESH_UI_TOAST_STAND_MS 4000U
+#define INKSTAND_TOAST_STAND_MS 4000U
 
-struct mesh_ui_toast {
+struct inkstand_toast {
     /* What is showing; empty when nothing is. */
-    char text[MESH_UI_TOAST_TEXT_MAX];
+    char text[INKSTAND_TOAST_TEXT_MAX];
     /* When it stops standing, or 0 while it is undated. A backend tells one notice from the next
        by this, which is why a promoted notice always gets a deadline of its own. */
     uint64_t until_ms;
@@ -69,41 +68,39 @@ struct mesh_ui_toast {
      * while it is still news, and a burst whose tail was dropped would show the three oldest
      * things that happened and silently withhold what happened last.
      */
-    char queue[MESH_UI_TOAST_QUEUE][MESH_UI_TOAST_TEXT_MAX];
+    char queue[INKSTAND_TOAST_QUEUE][INKSTAND_TOAST_TEXT_MAX];
     uint8_t queued;
 };
 
 /* Nothing showing, nothing waiting. */
-void mesh_ui_toast_init(struct mesh_ui_toast *toast);
+void inkstand_toast_init(struct inkstand_toast *toast);
 
 /* A notice a press raised, dated from `now_ms`: it replaces what is showing and leaves what is
    waiting alone. NULL or empty clears the notice *and* the backlog - "say nothing" - since a queue
    that outlived it would start talking again a moment later. */
-void mesh_ui_toast_set(struct mesh_ui_toast *toast, uint64_t now_ms, const char *text);
+void inkstand_toast_set(struct inkstand_toast *toast, uint64_t now_ms, const char *text);
 
-/* The same, raised undated, by whoever has no clock to hand. mesh_ui_toast_date() gives it its
+/* The same, raised undated, by whoever has no clock to hand. inkstand_toast_date() gives it its
    deadline, and must before the next tick: a tick retires an undated notice at once, since its
    deadline of 0 has already passed. */
-void mesh_ui_toast_raise(struct mesh_ui_toast *toast, const char *text);
+void inkstand_toast_raise(struct inkstand_toast *toast, const char *text);
 
 /* A notice something arriving raised: shown now if nothing is, and otherwise queued behind what is
    waiting. A repeat of what is showing, or of the newest thing waiting, is dropped - one event
    reported twice in a row is one notice, not two. */
-void mesh_ui_toast_post(struct mesh_ui_toast *toast, uint64_t now_ms, const char *text);
+void inkstand_toast_post(struct inkstand_toast *toast, uint64_t now_ms, const char *text);
 
 /* Takes down what is showing, for a press, and puts up the next one waiting, undated. Returns true
    when anything was showing. */
-bool mesh_ui_toast_dismiss(struct mesh_ui_toast *toast);
+bool inkstand_toast_dismiss(struct inkstand_toast *toast);
 
 /* Dates an undated notice from `now_ms`. A no-op on a dated notice or on none. */
-void mesh_ui_toast_date(struct mesh_ui_toast *toast, uint64_t now_ms);
+void inkstand_toast_date(struct inkstand_toast *toast, uint64_t now_ms);
 
 /* Retires a notice whose time is up and promotes the next one waiting, dated from `now_ms`.
    Returns true when what is showing changed. */
-bool mesh_ui_toast_tick(struct mesh_ui_toast *toast, uint64_t now_ms);
+bool inkstand_toast_tick(struct inkstand_toast *toast, uint64_t now_ms);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

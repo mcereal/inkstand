@@ -1,5 +1,5 @@
 /*
- * A snackbar's notices - see mesh/ui/toast.h.
+ * A snackbar's notices - see inkstand/nav/toast.h.
  */
 
 #include "inkstand/nav/toast.h"
@@ -7,18 +7,18 @@
 #include <stdio.h>
 #include <string.h>
 
-void mesh_ui_toast_init(struct mesh_ui_toast *toast) {
+void inkstand_toast_init(struct inkstand_toast *toast) {
     if (toast != NULL) {
         memset(toast, 0, sizeof *toast);
     }
 }
 
 /* Moves the oldest waiting notice up to the snackbar. The caller says whether it is dated. */
-static void promote(struct mesh_ui_toast *toast, uint64_t until_ms) {
+static void promote(struct inkstand_toast *toast, uint64_t until_ms) {
     snprintf(toast->text, sizeof toast->text, "%s", toast->queue[0]);
     toast->until_ms = until_ms;
     memmove(&toast->queue[0], &toast->queue[1],
-            (MESH_UI_TOAST_QUEUE - 1U) * sizeof toast->queue[0]);
+            (INKSTAND_TOAST_QUEUE - 1U) * sizeof toast->queue[0]);
     toast->queued--;
     memset(toast->queue[toast->queued], 0, sizeof toast->queue[toast->queued]);
 }
@@ -34,7 +34,7 @@ static void promote(struct mesh_ui_toast *toast, uint64_t until_ms) {
  * sentence coming back around after two others. Two identical notices in a row are one notice that
  * stood for eight seconds - a snackbar with a stuck button rather than news.
  */
-static bool queue(struct mesh_ui_toast *toast, const char *text) {
+static bool queue(struct inkstand_toast *toast, const char *text) {
     if (toast->text[0] == '\0') {
         return false; /* nothing is up; say it now */
     }
@@ -42,29 +42,29 @@ static bool queue(struct mesh_ui_toast *toast, const char *text) {
     if (strcmp(newest, text) == 0) {
         return true;
     }
-    if (toast->queued >= MESH_UI_TOAST_QUEUE) {
+    if (toast->queued >= INKSTAND_TOAST_QUEUE) {
         /* Drop the oldest waiting one and close the gap - see the field for why it is that end. */
         memmove(&toast->queue[0], &toast->queue[1],
-                (MESH_UI_TOAST_QUEUE - 1U) * sizeof toast->queue[0]);
-        toast->queued = MESH_UI_TOAST_QUEUE - 1U;
+                (INKSTAND_TOAST_QUEUE - 1U) * sizeof toast->queue[0]);
+        toast->queued = INKSTAND_TOAST_QUEUE - 1U;
     }
-    snprintf(toast->queue[toast->queued++], MESH_UI_TOAST_TEXT_MAX, "%s", text);
+    snprintf(toast->queue[toast->queued++], INKSTAND_TOAST_TEXT_MAX, "%s", text);
     return true;
 }
 
-void mesh_ui_toast_set(struct mesh_ui_toast *toast, uint64_t now_ms, const char *text) {
+void inkstand_toast_set(struct inkstand_toast *toast, uint64_t now_ms, const char *text) {
     if (toast == NULL) {
         return;
     }
     if (text == NULL || text[0] == '\0') {
-        mesh_ui_toast_init(toast);
+        inkstand_toast_init(toast);
         return;
     }
     snprintf(toast->text, sizeof toast->text, "%s", text);
-    toast->until_ms = now_ms + MESH_UI_TOAST_STAND_MS;
+    toast->until_ms = now_ms + INKSTAND_TOAST_STAND_MS;
 }
 
-void mesh_ui_toast_raise(struct mesh_ui_toast *toast, const char *text) {
+void inkstand_toast_raise(struct inkstand_toast *toast, const char *text) {
     if (toast == NULL || text == NULL || text[0] == '\0') {
         return;
     }
@@ -72,7 +72,7 @@ void mesh_ui_toast_raise(struct mesh_ui_toast *toast, const char *text) {
     toast->until_ms = 0U;
 }
 
-void mesh_ui_toast_post(struct mesh_ui_toast *toast, uint64_t now_ms, const char *text) {
+void inkstand_toast_post(struct inkstand_toast *toast, uint64_t now_ms, const char *text) {
     if (toast == NULL || text == NULL || text[0] == '\0') {
         return;
     }
@@ -80,7 +80,7 @@ void mesh_ui_toast_post(struct mesh_ui_toast *toast, uint64_t now_ms, const char
         return;
     }
     snprintf(toast->text, sizeof toast->text, "%s", text);
-    toast->until_ms = now_ms + MESH_UI_TOAST_STAND_MS;
+    toast->until_ms = now_ms + INKSTAND_TOAST_STAND_MS;
 }
 
 /*
@@ -89,7 +89,7 @@ void mesh_ui_toast_post(struct mesh_ui_toast *toast, uint64_t now_ms, const char
  * straight up ahead of it and the older ones followed, out of order. The one promoted here is
  * undated, exactly as a notice a press raises is, and is dated before anything is drawn.
  */
-bool mesh_ui_toast_dismiss(struct mesh_ui_toast *toast) {
+bool inkstand_toast_dismiss(struct inkstand_toast *toast) {
     if (toast == NULL || toast->text[0] == '\0') {
         return false;
     }
@@ -102,14 +102,14 @@ bool mesh_ui_toast_dismiss(struct mesh_ui_toast *toast) {
     return true;
 }
 
-void mesh_ui_toast_date(struct mesh_ui_toast *toast, uint64_t now_ms) {
+void inkstand_toast_date(struct inkstand_toast *toast, uint64_t now_ms) {
     if (toast == NULL || toast->text[0] == '\0' || toast->until_ms != 0U) {
         return;
     }
-    toast->until_ms = now_ms + MESH_UI_TOAST_STAND_MS;
+    toast->until_ms = now_ms + INKSTAND_TOAST_STAND_MS;
 }
 
-bool mesh_ui_toast_tick(struct mesh_ui_toast *toast, uint64_t now_ms) {
+bool inkstand_toast_tick(struct inkstand_toast *toast, uint64_t now_ms) {
     if (toast == NULL || toast->text[0] == '\0' || now_ms < toast->until_ms) {
         return false;
     }
@@ -117,7 +117,7 @@ bool mesh_ui_toast_tick(struct mesh_ui_toast *toast, uint64_t now_ms) {
         /* The next one takes the snackbar, dated from this tick rather than from whenever it was
            raised: it is starting to stand now, and a deadline the backend has not seen is how it
            tells one notice from the next. */
-        promote(toast, now_ms + MESH_UI_TOAST_STAND_MS);
+        promote(toast, now_ms + INKSTAND_TOAST_STAND_MS);
         return true;
     }
     toast->text[0] = '\0';
