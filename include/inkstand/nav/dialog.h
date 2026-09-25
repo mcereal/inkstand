@@ -1,5 +1,4 @@
-#ifndef MESH_UI_DIALOG_H
-#define MESH_UI_DIALOG_H
+#pragma once
 
 /*
  * A two-answer question put over the screen: go ahead, or don't.
@@ -30,12 +29,12 @@ extern "C" {
 #endif
 
 /* The two answers, as the cursor holds them. The leading one goes ahead. */
-#define MESH_UI_DIALOG_ACCEPT 0U
-#define MESH_UI_DIALOG_CANCEL 1U
+#define INKSTAND_DIALOG_ACCEPT 0U
+#define INKSTAND_DIALOG_CANCEL 1U
 
-struct mesh_ui_dialog {
+struct inkstand_dialog {
     bool open;
-    /* MESH_UI_DIALOG_ACCEPT or MESH_UI_DIALOG_CANCEL. */
+    /* INKSTAND_DIALOG_ACCEPT or INKSTAND_DIALOG_CANCEL. */
     uint8_t cursor;
     /* What the question is about, in the application's terms; 0 when it is about nothing more than
        the screen it was raised over. The dialog carries it and never reads it. */
@@ -43,18 +42,18 @@ struct mesh_ui_dialog {
 };
 
 /* What a press did to an open dialog. */
-enum mesh_ui_dialog_press {
-    MESH_UI_DIALOG_IGNORED = 0, /* not a key a dialog answers, or a move with nowhere to go */
-    MESH_UI_DIALOG_MOVED,       /* the cursor went to the other answer */
-    MESH_UI_DIALOG_ACCEPTED,    /* go ahead; the dialog has closed */
-    MESH_UI_DIALOG_CANCELLED,   /* don't; the dialog has closed */
+enum inkstand_dialog_press {
+    INKSTAND_DIALOG_IGNORED = 0, /* not a key a dialog answers, or a move with nowhere to go */
+    INKSTAND_DIALOG_MOVED,       /* the cursor went to the other answer */
+    INKSTAND_DIALOG_ACCEPTED,    /* go ahead; the dialog has closed */
+    INKSTAND_DIALOG_CANCELLED,   /* don't; the dialog has closed */
 };
 
 /* Puts the question up, about `subject`, with the cursor on Cancel. */
-void mesh_ui_dialog_open(struct mesh_ui_dialog *dialog, uint16_t subject);
+void inkstand_dialog_open(struct inkstand_dialog *dialog, uint16_t subject);
 
 /* Takes it down and forgets its subject. */
-void mesh_ui_dialog_close(struct mesh_ui_dialog *dialog);
+void inkstand_dialog_close(struct inkstand_dialog *dialog);
 
 /*
  * Where a direction key takes the cursor from `cursor`, over a frame's focus map in which the two
@@ -66,8 +65,8 @@ void mesh_ui_dialog_close(struct mesh_ui_dialog *dialog);
  * before the dialog opened, any direction simply goes to the other answer. A direction with no
  * answer that way leaves the cursor where it is - the edge of the dialog - rather than wrapping.
  */
-uint8_t mesh_ui_dialog_answer(const struct inkcell_focus_map *map, uint32_t focus_base,
-                              enum inkcell_key key, uint8_t cursor);
+uint8_t inkstand_dialog_answer(const struct inkcell_focus_map *map, uint32_t focus_base,
+                               enum inkcell_key key, uint8_t cursor);
 
 /*
  * A key pressed over an open dialog. Direction keys move between the answers; A and START answer
@@ -75,13 +74,11 @@ uint8_t mesh_ui_dialog_answer(const struct inkcell_focus_map *map, uint32_t focu
  * about is written to `out_subject` first - so the caller acts on ACCEPTED knowing what was
  * accepted.
  */
-enum mesh_ui_dialog_press mesh_ui_dialog_key(struct mesh_ui_dialog *dialog,
-                                             const struct inkcell_focus_map *map,
-                                             uint32_t focus_base, enum inkcell_key key,
-                                             uint16_t *out_subject);
+enum inkstand_dialog_press inkstand_dialog_key(struct inkstand_dialog *dialog,
+                                               const struct inkcell_focus_map *map,
+                                               uint32_t focus_base, enum inkcell_key key,
+                                               uint16_t *out_subject);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
