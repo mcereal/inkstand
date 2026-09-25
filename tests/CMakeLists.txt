@@ -12,6 +12,7 @@ set(INKSTAND_TEST_CORE_SUITES
     suites/persist_fields.c
     suites/persist_journal.c
     suites/persist_keys.c
+    suites/persist_recent.c
 )
 
 # The half that draws: nav/, form/, app/.
