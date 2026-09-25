@@ -77,6 +77,7 @@ add_library(inkstand_core STATIC
     src/persist/fields.c
     src/persist/journal.c
     src/persist/keys.c
+    src/persist/recent.c
 )
 target_include_directories(inkstand_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
