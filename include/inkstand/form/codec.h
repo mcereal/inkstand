@@ -1,5 +1,4 @@
-#ifndef MESH_UI_FORM_CODEC_H
-#define MESH_UI_FORM_CODEC_H
+#pragma once
 
 /*
  * A form's values as the text a person types, and back.
@@ -28,7 +27,7 @@ extern "C" {
 
 /* The most decimal places a value may be held to. Past 1e9 a scaled int64 stops being able to
    hold a whole part anybody would type. */
-#define MESH_UI_FORM_DECIMAL_DIGITS_MAX 9U
+#define INKSTAND_FORM_DECIMAL_DIGITS_MAX 9U
 
 /*
  * A decimal held as an integer scaled by `held_digits` places, printed to `shown_digits` of them.
@@ -37,8 +36,8 @@ extern "C" {
  * value between -1 and 0 keeps its sign, which has nowhere else to live once the whole part is
  * zero. Shown wider than held is shown at held.
  */
-void mesh_ui_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t shown_digits,
-                               char *out, size_t out_len);
+void inkstand_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t shown_digits,
+                                char *out, size_t out_len);
 
 /*
  * A decimal a person typed, as an integer scaled by `digits` places.
@@ -50,8 +49,8 @@ void mesh_ui_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t sh
  * `limit_whole`, and a fraction finer than `digits` that is not zeros - a row taking "12.5" as
  * 12 is the same mistake made quietly.
  */
-bool mesh_ui_form_decimal_parse(const char *text, uint32_t digits, int64_t limit_whole,
-                                int64_t *out_scaled);
+bool inkstand_form_decimal_parse(const char *text, uint32_t digits, int64_t limit_whole,
+                                 int64_t *out_scaled);
 
 /*
  * A 32-bit identifier, written as `marker` and eight lower-case hex digits: "!433d1b2c".
@@ -59,7 +58,7 @@ bool mesh_ui_form_decimal_parse(const char *text, uint32_t digits, int64_t limit
  * Zero is no identifier, and prints as an empty string: it is what an empty row parses to, and a
  * caller reads it as "this slot is unused".
  */
-void mesh_ui_form_id_text(uint32_t id, char marker, char *out, size_t out_len);
+void inkstand_form_id_text(uint32_t id, char marker, char *out, size_t out_len);
 
 /*
  * An identifier in whichever spelling somebody has in front of them: `marker` and hex, "0x" and
@@ -72,14 +71,14 @@ void mesh_ui_form_id_text(uint32_t id, char marker, char *out, size_t out_len);
  * refused it would make the row unclearable. Refused: a bare marker, a non-digit, and anything
  * past 32 bits.
  */
-bool mesh_ui_form_id_parse(const char *text, char marker, uint32_t *out_id);
+bool inkstand_form_id_parse(const char *text, char marker, uint32_t *out_id);
 
 /* Bytes as lower-case hex, two digits each. Stops at the last whole byte `out` can hold. */
-void mesh_ui_form_bytes_hex(const uint8_t *bytes, size_t len, char *out, size_t out_len);
+void inkstand_form_bytes_hex(const uint8_t *bytes, size_t len, char *out, size_t out_len);
 
 /* Bytes as padded base64 in the standard alphabet - the form a person copies between programs.
    The URL-safe alphabet belongs to a URL, not to a row somebody types into. */
-void mesh_ui_form_bytes_base64(const uint8_t *bytes, size_t len, char *out, size_t out_len);
+void inkstand_form_bytes_base64(const uint8_t *bytes, size_t len, char *out, size_t out_len);
 
 /*
  * Bytes from text that is hex or base64. An empty string is no bytes and succeeds.
@@ -90,11 +89,9 @@ void mesh_ui_form_bytes_base64(const uint8_t *bytes, size_t len, char *out, size
  * padded base64 with every character accounted for: a mistyped key decodes to a plausible wrong
  * key, and nothing downstream says so.
  */
-bool mesh_ui_form_bytes_parse(const char *text, const size_t *hex_sizes, size_t hex_size_count,
-                              uint8_t *out, size_t out_cap, size_t *out_len);
+bool inkstand_form_bytes_parse(const char *text, const size_t *hex_sizes, size_t hex_size_count,
+                               uint8_t *out, size_t out_cap, size_t *out_len);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

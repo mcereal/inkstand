@@ -2,7 +2,7 @@
 
 /*
  * A form's values as text and back: decimals, identifiers and bytes. Both directions are here
- * so the parse and the print stay in step - see mesh/ui/form_codec.h.
+ * so the parse and the print stay in step - see inkstand/form/codec.h.
  */
 
 #include "inkstand/form/codec.h"
@@ -26,8 +26,8 @@ static int64_t decimal_scale(uint32_t digits) {
     return digits < (sizeof k_powers / sizeof k_powers[0]) ? k_powers[digits] : k_powers[9];
 }
 
-void mesh_ui_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t shown_digits,
-                               char *out, size_t out_len) {
+void inkstand_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t shown_digits,
+                                char *out, size_t out_len) {
     if (out == NULL || out_len == 0U) {
         return;
     }
@@ -52,10 +52,10 @@ void mesh_ui_form_decimal_text(int64_t scaled, uint32_t held_digits, uint32_t sh
     }
 }
 
-bool mesh_ui_form_decimal_parse(const char *text, uint32_t digits, int64_t limit_whole,
-                                int64_t *out_scaled) {
+bool inkstand_form_decimal_parse(const char *text, uint32_t digits, int64_t limit_whole,
+                                 int64_t *out_scaled) {
     if (text == NULL || out_scaled == NULL || limit_whole <= 0 ||
-        digits > MESH_UI_FORM_DECIMAL_DIGITS_MAX) {
+        digits > INKSTAND_FORM_DECIMAL_DIGITS_MAX) {
         return false;
     }
     const char *p = text;
@@ -134,7 +134,7 @@ static int hex_nibble(char c) {
     return -1;
 }
 
-void mesh_ui_form_id_text(uint32_t id, char marker, char *out, size_t out_len) {
+void inkstand_form_id_text(uint32_t id, char marker, char *out, size_t out_len) {
     if (out == NULL || out_len == 0U) {
         return;
     }
@@ -145,7 +145,7 @@ void mesh_ui_form_id_text(uint32_t id, char marker, char *out, size_t out_len) {
     snprintf(out, out_len, "%c%08x", marker, (unsigned)id);
 }
 
-bool mesh_ui_form_id_parse(const char *text, char marker, uint32_t *out_id) {
+bool inkstand_form_id_parse(const char *text, char marker, uint32_t *out_id) {
     if (text == NULL || out_id == NULL) {
         return false;
     }
@@ -204,7 +204,7 @@ bool mesh_ui_form_id_parse(const char *text, char marker, uint32_t *out_id) {
     return true;
 }
 
-void mesh_ui_form_bytes_hex(const uint8_t *bytes, size_t len, char *out, size_t out_len) {
+void inkstand_form_bytes_hex(const uint8_t *bytes, size_t len, char *out, size_t out_len) {
     if (out == NULL || out_len == 0U) {
         return;
     }
@@ -219,7 +219,7 @@ void mesh_ui_form_bytes_hex(const uint8_t *bytes, size_t len, char *out, size_t 
     }
 }
 
-void mesh_ui_form_bytes_base64(const uint8_t *bytes, size_t len, char *out, size_t out_len) {
+void inkstand_form_bytes_base64(const uint8_t *bytes, size_t len, char *out, size_t out_len) {
     if (out == NULL || out_len == 0U) {
         return;
     }
@@ -227,7 +227,7 @@ void mesh_ui_form_bytes_base64(const uint8_t *bytes, size_t len, char *out, size
     if (bytes == NULL) {
         return;
     }
-    /* The standard alphabet, padded: the form mesh_ui_form_bytes_parse() reads back. The
+    /* The standard alphabet, padded: the form inkstand_form_bytes_parse() reads back. The
        URL-safe one belongs to a URL and nowhere near a field somebody types into. */
     (void)inkwell_base64_encode(bytes, len, false, out, out_len);
 }
@@ -249,8 +249,8 @@ static bool parse_hex(const char *text, size_t digits, uint8_t *out, size_t out_
     return true;
 }
 
-bool mesh_ui_form_bytes_parse(const char *text, const size_t *hex_sizes, size_t hex_size_count,
-                              uint8_t *out, size_t out_cap, size_t *out_len) {
+bool inkstand_form_bytes_parse(const char *text, const size_t *hex_sizes, size_t hex_size_count,
+                               uint8_t *out, size_t out_cap, size_t *out_len) {
     if (text == NULL || out == NULL || out_len == NULL) {
         return false;
     }
