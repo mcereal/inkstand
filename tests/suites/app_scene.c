@@ -448,9 +448,11 @@ INKSTAND_TEST_CASE(scene_frames_an_application_verb_unless_told_not_to, unit) {
 }
 
 INKSTAND_TEST_CASE(scene_refuses_setup_after_the_first_frame, unit) {
-    static const char *const scripts[] = {"frame\nscale 3", "frame\nearly",
-                                          "frame\nclock "
-                                          "2026-01-12 19:12"};
+    static const char *const scripts[] = {
+        "frame\nscale 3",
+        "frame\nearly",
+        "frame\nclock 2026-01-12 19:12",
+    };
     const char *failure = NULL;
     for (size_t i = 0U; i < sizeof scripts / sizeof scripts[0] && failure == NULL; ++i) {
         struct test_rig rig;
