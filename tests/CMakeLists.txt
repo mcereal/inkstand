@@ -10,6 +10,7 @@
 # is the proof they need nothing from inkcell.
 set(INKSTAND_TEST_CORE_SUITES
     suites/persist_fields.c
+    suites/persist_journal.c
     suites/persist_keys.c
 )
 
