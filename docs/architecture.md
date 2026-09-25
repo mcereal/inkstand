@@ -119,7 +119,8 @@ stay behind as a `.def`. The codec came first, as `form/codec.h`: the parse and 
 a decimal, an identifier and a run of bytes, with the spellings that are an application's own -
 a marker, the sizes a key is read as hex at - passed in rather than known. The number scale followed as
 `form/scale.h`: a row's presets and whether they measure or name, and the walk a choice row
-makes through a set.
+makes through a set. The field descriptor followed as `form/field.h`, which an
+application extends by embedding it first in a row of its own.
 
 ### 6. Persistence has two shapes
 

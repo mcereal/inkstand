@@ -104,6 +104,7 @@ if(INKSTAND_WITH_UI)
     add_library(inkstand STATIC
         # form/ - fields, and the text a person types into one
         src/form/codec.c
+        src/form/field.c
         src/form/scale.c
         # nav/ - where the reader is, and when a frame is drawn
         src/nav/frame_scheduler.c
