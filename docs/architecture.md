@@ -126,7 +126,7 @@ stay behind as a `.def`.
   `base/record_file.h`.
 - **A journal**: an append-only log per subject, which is what `store_archive.c` (a
   conversation's history past the in-memory ring) and `store_trends.c` (a node's readings past
-  one run) each built separately.
+  one run) each built separately, and now share as `persist/journal.h`.
 
 Together they are roughly what `localStorage` and a small IndexedDB are to a web page, sized
 for an SD card.
