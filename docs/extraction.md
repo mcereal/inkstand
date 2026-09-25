@@ -267,9 +267,29 @@ values, which needed no field id at all.
 - **Stayed behind:** every preset list and which field uses it, the kind check in front of each
   call, and `struct mesh_ui_settings_track`, which the renderer still reads.
 
-**Next:** the field descriptor and its kinds (`form/field.h`) - which wants mesh-client's field
-enum turned into a `.def` first, and a 16-bit field id, since a form of 200 fields is already
-most of the way to an 8-bit one. Then pending edits, then the row model.
+**4c. The field descriptor - done.** One row of a form, and the questions every caller asks of
+one.
+
+- **Moved:** `include/inkstand/form/field.h` and `src/form/field.c`: `enum inkstand_form_kind`
+  (every kind a row can be, from INFO to METER), `struct inkstand_form_field` (label, kind,
+  section, limit, enum names, presets, choices, note), and `struct inkstand_form`, which reads
+  the application's table through a stride. The seam was made in mesh-client first, as
+  `form_field.{c,h}`, in two commits: one that widened every place a field id was kept to 16
+  bits, and one that split the descriptor out of the field table.
+- **Decided on the way:** the application *extends* a row by embedding the descriptor as its
+  first member, so columns that are its alone - a formatter that knows its units, a word for
+  what 0 means - sit after it in the same table without inkstand naming them. mesh-client's 195
+  positional rows were reordered once, by a script, to put the descriptor's columns first. A
+  field id is an index with 0 for no field, and every id past the table resolves to row 0; a
+  section is a 16-bit id the form compares and never interprets.
+- **Tests:** `tests/suites/form_field.c`, new, over a table of the suite's own built the way an
+  application builds one. mesh-client's settings suite still holds what its rows are.
+- **Stayed behind:** the field enum and all 195 rows, the sections, the groups of flag rows,
+  `key_len_ok()`, the formatters and zero-words, and every `mesh_ui_settings_*` accessor as the
+  one-line call into this descriptor.
+
+**Next:** pending edits (`form/edits.h`) - the buffer of changed values, set-or-drop-if-base,
+and the drop by commit group that `store.c` does - then the row model.
 
 ### 5. The overlays
 
