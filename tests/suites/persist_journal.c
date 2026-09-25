@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /* ---- fixtures ------------------------------------------------------------------------------- */
@@ -147,6 +148,9 @@ INKSTAND_TEST_CASE(journal_init_refuses_what_it_cannot_honour_and_stays_disabled
     struct inkstand_journal journal;
     char nested[160];
     snprintf(nested, sizeof nested, "%s/missing/journal", fixture.root);
+    char in_the_way[160];
+    snprintf(in_the_way, sizeof in_the_way, "%s/a-file", fixture.root);
+    INKSTAND_TEST_FAIL_IF(!spill(in_the_way, "not a directory"), "could not stage the file");
     char long_dir[INKSTAND_JOURNAL_DIR_MAX + 8U];
     memset(long_dir, 'd', sizeof long_dir - 1U);
     long_dir[0] = '/';
@@ -166,6 +170,7 @@ INKSTAND_TEST_CASE(journal_init_refuses_what_it_cannot_honour_and_stays_disabled
         {fixture.dir, ".a-suffix-far-too-long", -ENAMETOOLONG},
         {long_dir, ".log", -ENAMETOOLONG}, /* would have been truncated */
         {nested, ".log", -ENOENT},         /* one level only: the parent is missing */
+        {in_the_way, ".log", -ENOTDIR},    /* a file where the directory should be */
     };
     for (size_t i = 0U; i < sizeof cases / sizeof cases[0]; ++i) {
         const int result = inkstand_journal_init(&journal, cases[i].dir, cases[i].suffix, 0U);
@@ -487,6 +492,34 @@ INKSTAND_TEST_CASE(journal_forget_all_takes_only_its_own_files, unit) {
     INKSTAND_TEST_FAIL_IF(dropped != 1, "the wipe did not count only the subjects' files");
     INKSTAND_TEST_FAIL_IF(!ours_gone, "a file of the journal's, or its temporary, survived");
     INKSTAND_TEST_FAIL_IF(!theirs_kept, "a file that is not the journal's was removed");
+    record_success(test_name);
+}
+
+INKSTAND_TEST_CASE(journal_forget_all_reports_a_file_it_could_not_remove, unit) {
+    struct journal_fixture fixture;
+    INKSTAND_TEST_FAIL_IF(!fixture_open(&fixture), "could not make a temporary directory");
+    struct inkstand_journal journal;
+    INKSTAND_TEST_FAIL_IF(inkstand_journal_init(&journal, fixture.dir, ".trend", 0U) != 0,
+                          "init failed");
+
+    /* remove() refuses a directory with something in it whoever is asking - root included, which
+       a permission bit would not stop - so a directory wearing the journal's suffix is a file
+       the wipe cannot take. The wipe still takes the ones it can. */
+    char stuck[256];
+    char inside[300];
+    char other[256];
+    snprintf(stuck, sizeof stuck, "%s/stuck.trend", fixture.dir);
+    snprintf(inside, sizeof inside, "%s/keep", stuck);
+    snprintf(other, sizeof other, "%s/other.trend", fixture.dir);
+    const bool staged = mkdir(stuck, 0700) == 0 && spill(inside, "x") && spill(other, "k=1\n");
+
+    const int wiped = inkstand_journal_forget_all(&journal);
+    const bool other_gone = !file_exists(other);
+
+    fixture_close(&fixture);
+    INKSTAND_TEST_FAIL_IF(!staged, "could not stage the files");
+    INKSTAND_TEST_FAIL_IF(wiped >= 0, "a wipe that left a file behind reported success");
+    INKSTAND_TEST_FAIL_IF(!other_gone, "one stuck file stopped the wipe removing the rest");
     record_success(test_name);
 }
 

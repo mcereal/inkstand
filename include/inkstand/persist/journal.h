@@ -81,9 +81,10 @@ struct inkstand_journal {
  *
  * 0 on success. On failure the journal is left disabled - usable, and quiet - and the reason is
  * returned: -EINVAL for an empty directory or a suffix that is not a plain word after its dot,
- * -ENAMETOOLONG for a directory or suffix longer than the limits above, or the errno making the
- * directory failed with. A caller that only wants to know whether it has somewhere to write asks
- * inkstand_journal_enabled() afterwards.
+ * -ENAMETOOLONG for a directory or suffix longer than the limits above, -ENOTDIR when something
+ * other than a directory is already at `dir`, or the errno making the directory failed with. A
+ * caller that only wants to know whether it has somewhere to write asks inkstand_journal_enabled()
+ * afterwards.
  */
 int inkstand_journal_init(struct inkstand_journal *journal, const char *dir, const char *suffix,
                           uint64_t max_bytes);
@@ -159,7 +160,9 @@ int inkstand_journal_filter(const struct inkstand_journal *journal, const char *
 int inkstand_journal_forget(const struct inkstand_journal *journal, const char *subject);
 
 /* Removes every file this journal wrote, and any temporary an interrupted rewrite left beside
-   one. Returns how many subjects' files were removed, or a negative errno. */
+   one. Returns how many subjects' files were removed, or the first negative errno a removal
+   failed with - a wipe that left a file behind does not report success, though it still removes
+   everything else it can. */
 int inkstand_journal_forget_all(const struct inkstand_journal *journal);
 
 /*

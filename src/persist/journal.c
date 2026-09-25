@@ -3,10 +3,9 @@
 /*
  * The journal's mechanics. What it is for and the four decisions behind it are in the header.
  *
- * Nothing here says which kernel it runs on: the directory is made and a temporary published
- * through inkwell's base/file.h, a size is read with fseek()/ftell() on the stream the append
- * holds, and a file is removed with remove(). The one POSIX interface is the directory listing a
- * wipe walks, which every system this builds for has.
+ * Nothing here says which kernel it runs on: the directory is made, checked, listed and a
+ * temporary published through inkwell's base/file.h, a size is read with fseek()/ftell() on the
+ * stream the append holds, and a file is removed with remove().
  */
 
 #include "inkstand/persist/journal.h"
@@ -14,7 +13,6 @@
 #include "inkwell/base/file.h"
 #include "inkwell/base/text.h"
 
-#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -88,6 +86,11 @@ int inkstand_journal_init(struct inkstand_journal *journal, const char *dir, con
     const int made = inkwell_file_mkdir(dir);
     if (made < 0 && made != -EEXIST) {
         return made;
+    }
+    /* -EEXIST says something is there, not that it is a directory. A file in the way would be
+       taken for one and every open inside it would fail later, far from the reason. */
+    if (made == -EEXIST && !inkwell_file_is_dir(dir)) {
+        return -ENOTDIR;
     }
     inkwell_str_copy(journal->dir, sizeof journal->dir, dir);
     inkwell_str_copy(journal->suffix, sizeof journal->suffix, suffix);
@@ -330,41 +333,56 @@ static bool journal_ends_with(const char *name, size_t name_len, const char *suf
     return name_len > suffix_len && memcmp(name + name_len - suffix_len, suffix, suffix_len) == 0;
 }
 
+struct journal_wipe {
+    const struct inkstand_journal *journal;
+    char temp_suffix[INKSTAND_JOURNAL_SUFFIX_MAX + sizeof JOURNAL_TEMP_SUFFIX];
+    int dropped;
+    /* The first removal that failed, kept so a wipe that left files behind does not say it
+       succeeded. The walk carries on past it: one stuck file is no reason to keep the rest. */
+    int failed;
+};
+
+static void journal_wipe_entry(void *context, const char *name) {
+    struct journal_wipe *wipe = context;
+    /* Only what this journal writes, matched on the suffix: the directory is the caller's to
+       share, but a temporary an interrupted rewrite left behind is ours too and goes with the
+       file it was going to replace. */
+    const size_t name_len = strlen(name);
+    const bool is_file = journal_ends_with(name, name_len, wipe->journal->suffix);
+    const bool is_temp = journal_ends_with(name, name_len, wipe->temp_suffix);
+    if (!is_file && !is_temp) {
+        return;
+    }
+    char path[INKSTAND_JOURNAL_DIR_MAX + 256U];
+    const int written = snprintf(path, sizeof path, "%s/%s", wipe->journal->dir, name);
+    if (written <= 0 || (size_t)written >= sizeof path) {
+        if (wipe->failed == 0) {
+            wipe->failed = -ENAMETOOLONG;
+        }
+        return;
+    }
+    if (remove(path) != 0) {
+        if (errno != ENOENT && wipe->failed == 0) {
+            wipe->failed = -errno;
+        }
+        return;
+    }
+    if (is_file) {
+        ++wipe->dropped;
+    }
+}
+
 int inkstand_journal_forget_all(const struct inkstand_journal *journal) {
     if (!inkstand_journal_enabled(journal)) {
         return 0;
     }
-    DIR *dir = opendir(journal->dir);
-    if (dir == NULL) {
-        return (errno == ENOENT) ? 0 : -errno;
+    struct journal_wipe wipe = {.journal = journal};
+    snprintf(wipe.temp_suffix, sizeof wipe.temp_suffix, "%s" JOURNAL_TEMP_SUFFIX, journal->suffix);
+    const int listed = inkwell_file_list(journal->dir, journal_wipe_entry, &wipe);
+    if (listed != 0) {
+        return listed == -ENOENT ? 0 : listed;
     }
-    char temp_suffix[INKSTAND_JOURNAL_SUFFIX_MAX + sizeof JOURNAL_TEMP_SUFFIX];
-    snprintf(temp_suffix, sizeof temp_suffix, "%s" JOURNAL_TEMP_SUFFIX, journal->suffix);
-
-    int dropped = 0;
-    const struct dirent *entry = NULL;
-    while ((entry = readdir(dir)) != NULL) {
-        /* Only what this journal writes, matched on the suffix: the directory is the caller's to
-           share, but a temporary an interrupted rewrite left behind is ours too and goes with the
-           file it was going to replace. */
-        const char *name = entry->d_name;
-        const size_t name_len = strlen(name);
-        const bool is_file = journal_ends_with(name, name_len, journal->suffix);
-        const bool is_temp = journal_ends_with(name, name_len, temp_suffix);
-        if (!is_file && !is_temp) {
-            continue;
-        }
-        char path[INKSTAND_JOURNAL_DIR_MAX + 256U];
-        const int written = snprintf(path, sizeof path, "%s/%s", journal->dir, name);
-        if (written <= 0 || (size_t)written >= sizeof path) {
-            continue;
-        }
-        if (remove(path) == 0 && is_file) {
-            ++dropped;
-        }
-    }
-    closedir(dir);
-    return dropped;
+    return wipe.failed != 0 ? wipe.failed : wipe.dropped;
 }
 
 /* ---- the ring ------------------------------------------------------------------------------- */
