@@ -172,10 +172,31 @@ conversation) and each other's key tables.
   `mesh_ui_store_key_in_cache()` (which file a key belongs to is the application's), and a
   one-line wrapper per function so no caller in mesh-client changed.
 
-**Next: the journal.** `store_archive.c` and `store_trends.c` each keep an append-only log per
-subject with its own compaction; the step is one journal under both. They name
-`mesh/utils/file.h` and, in the archive, `mesh/ui/nav.h` - each needs its seam before it moves.
-`preferences.c` is independent of both and can come any time.
+**3b. The journal - done.** One append-only journal under both logs.
+
+- **Moved:** `include/inkstand/persist/journal.h` and `src/persist/journal.c`. The seam was made
+  in mesh-client first, as `store_journal.{c,h}` under both files, and came down in a commit that
+  is only a move before the rename. What the two had in common was more than this page guessed:
+  not only the append and the compaction but the directory that disables itself rather than
+  failing, the ring a reader folds a file into, the rewrite through a temporary, the filtered
+  copy the archive's delete streams through, and the trend log's wipe. A subject is a plain word
+  the caller spells - `c07`, `n1a2b3c4d` - and a record is the caller's callbacks.
+- **Decided on the way:** every question about a file is asked of the stream the append holds
+  (the trend log's rule; the archive had stat()ed the name after appending). Compaction stays
+  the caller's, cued by the append reporting the file over its cap, because only the caller
+  knows where one record ends. The ring counts what it drops for both, though only the archive
+  asks. A filter that drops nothing leaves the file alone. Two kernel calls went further down
+  than here: `inkwell_file_mkdir()` and `inkwell_file_replace()`, the second because a bare
+  `rename()` refused over an existing file on Windows, and both mesh-client's rewrites used one.
+- **Tests:** `tests/suites/persist_journal.c`, new. mesh-client held these promises only through
+  a whole store's round trip; its archive and trend suites still run there, over this journal,
+  and hold what the records mean.
+- **Stayed behind:** everything about what a record is - the message codec and the fold of a
+  re-delivered message, the delta chain and its restart seam, which conversation a message
+  belongs to, the recent ring and the seed, the retention numbers and the suffixes.
+
+**Next:** `preferences.c` - a bounded most-recently-used list, persisted - is independent of
+both and can come any time.
 
 ### 4. The form model and codec
 
