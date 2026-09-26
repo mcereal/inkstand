@@ -22,47 +22,27 @@ built on both keeps writing for itself. An inkstand is the tray on a writing des
 the well and the pens: it makes no ink and draws no line, it holds the pieces in place so you
 can write.
 
-## Status
+It is being extracted from [mesh-client](https://github.com/mcereal/mesh-client), a Meshtastic
+client for the TrimUI Brick: the parts of its store, navigation, settings and app glue that any
+second application on this stack would otherwise write again.
 
-**Early: two components, and the skeleton around them.** The build, the layering rule, the test
-runner and CI are here, and so are the first pieces to come down from mesh-client: the frame
-scheduler in `nav/`, which draws only while something is moving, and the control socket in
-`app/`, which lets a developer or an agent press keys by name and bring back a picture of the
-frame. What arrives next, from where and in what order is
-[`docs/extraction.md`](docs/extraction.md), and why it is shaped the way it is is
-[`docs/architecture.md`](docs/architecture.md). The table below describes the areas the code is
-landing in; most of them are still empty.
+The pattern is Elm's architecture, or Redux's: state in one place, a press becomes an action, an
+update decides what changes, and a view is drawn from a snapshot it cannot edit. What is
+particular here is doing it in C17 with fixed memory, no threads and one loop - and keeping the
+half that does not draw usable by a program that never will. How the areas are meant to fit
+together, and why, is [`docs/architecture.md`](docs/architecture.md).
 
-## Why it exists
+## What is in it
 
-It is the third cut of [mesh-client](https://github.com/mcereal/mesh-client), a Meshtastic
-client that began on the TrimUI Brick. The first cut took out everything that was never about
-Meshtastic and was about drawing - that is inkcell. The second took out everything that was
-never about Meshtastic and never about drawing either - that is inkwell.
+**Early.** The areas below are where the code lives; not all of them have code yet.
 
-What was left behind is about 27,000 lines under mesh-client's `src/ui/{store,nav,settings}` and
-`src/app/`, and a good share of it is not about Meshtastic at all. A store that publishes a
-snapshot and wakes the loop, a controller that draws only while something moves, a toast queue,
-a confirm dialog, a settings model with fields and steps and pending edits, a key table for a
-cache that must outlive every build that wrote it, a control socket that lets an agent press
-keys and bring back a picture - any second application on this stack would write every one of
-those again. That is the evidence for a third layer, and the reason not to build it until
-there was a first application to take it from.
-
-The pattern is not new. It is Elm's architecture, or Redux's: state in one place, a press
-becomes an action, an update decides what changes, and a view is drawn from a snapshot it
-cannot edit. What is particular here is doing it in C17 with fixed memory, no threads and one
-loop - and keeping the half that does not draw usable by a program that never will.
-
-## What will be in it
-
-| Area | What it owns | Needs |
+| Area | What is there | Needs |
 |---|---|---|
-| `state/` | The store, the snapshot and its wake, actions, effects, selectors that recompute only when their input moved | inkwell |
-| `persist/` | A typed cache whose keys are forever, append-only journals per subject, a most-recently-used list | inkwell |
-| `form/` | Fields by kind - toggle, choice, number with a step, text with a limit, decimal - sections, groups, pending edits committed as one action, the text codec | inkwell, inkcell |
-| `nav/` | The screen stack, the overlays every screen shares (toast, confirm, keyboard, help), the frame scheduler | inkwell, inkcell |
-| `app/` | Lifecycle, the composition of the rest, the control socket, the self-updater | inkwell, inkcell |
+| `state/` | Nothing yet. Will hold the store, the snapshot and its wake, actions and effects | inkwell |
+| `persist/` | `keys.h` and `fields.h` (a typed cache whose keys are forever), `journal.h` (an append-only log per subject), `recent.h` (a bounded most-recently-used list) | inkwell |
+| `form/` | `codec.h` (text to value and back), `scale.h` (a number row's presets and a choice row's walk), `field.h` (one row of a form, read from the application's table) | inkwell, inkcell |
+| `nav/` | `frame_scheduler.h` (draws only while something moves), `toast.h` (the snackbar's queue), `dialog.h` (the two-answer modal) | inkwell, inkcell |
+| `app/` | `control.h` (a socket to press keys by name and bring back a frame), `scene.h` (plays a scripted sequence of presses) | inkwell, inkcell |
 
 **`state/` and `persist/` are headless.** They link inkwell and nothing else, so a daemon, a
 bridge or a CLI can keep a store and a journal without a toolkit in its link line.

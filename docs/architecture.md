@@ -1,7 +1,8 @@
 # Architecture
 
-How inkstand is meant to be shaped, and why. This is the design the extractions are aimed at;
-where one of them proves a decision here wrong, this page changes with it.
+How inkstand is shaped, and why. Some of it is built and some is the design the rest is aimed
+at; the README says which areas have code. When a change proves a decision here wrong, the
+change fixes this page.
 
 ## The loop, in one picture
 
@@ -59,12 +60,12 @@ What it buys:
 - **Every decision is testable without a device.** Hand the update a state and an action, look
   at the state and the effects. No mock transport.
 - **A session can be replayed.** If the state is a function of the actions, the last few
-  hundred actions *are* the bug report. See [recording](#what-is-new-rather-than-moved).
+  hundred actions *are* the bug report.
 - **The effects are a list somebody can read.** Today the answer to "what can this client do
   to a radio" is spread across a 2,000-line action handler.
 
-What it costs: mesh-client's action handler has to be turned inside out, and that is the
-largest single change the extraction asks of it. It is step 6 of seven for that reason.
+What it costs: an application written the other way round - mesh-client's action handler is
+one - has to be turned inside out to adopt it.
 
 ### 3. A screen stack, not a flat nav
 
@@ -95,15 +96,14 @@ A screen's cursor, its draft and its armed press live in its own frame, so a new
 state without widening a struct every other screen shares. Frames are fixed-size and the stack
 is bounded, so none of this allocates.
 
-This is the riskiest decision here, because it is a change to how mesh-client's navigation
-*works* rather than a file move. It is done inside mesh-client first, against mesh-client's own
-nav suites, and only moved once those pass.
+This is a change to how navigation *works* rather than a file move, so it is proven inside
+mesh-client, against its own nav suites, before any of it comes here.
 
 ### 4. Overlays are services
 
 The toast queue, the confirm dialog, the keyboard session, the help sheet and the "press twice
 to confirm" arming are each written once in mesh-client and used by many screens. Here they
-are services any screen asks for - `inkstand_toast_post()`, `inkstand_confirm_raise()` - with
+are services any screen asks for - `inkstand_toast_post()`, `inkstand_dialog_open()` - with
 their rules kept: a full toast queue drops the oldest *waiting* notice, never the newest, because
 a backlog is only worth keeping while it is still news; an armed press names the *subject* it
 was armed on rather than the row, because rows re-sort under the cursor.
@@ -114,13 +114,16 @@ mesh-client's settings model is about 5,500 lines, and most of it is mechanism: 
 kind (toggle, choice, number, text, decimal, key), a step and a track for numbers, a maximum
 for text, a section and a group; edits are held as pending and committed as one action; a
 value round-trips through text by a codec that must parse exactly what it prints. The ~200
-Meshtastic fields are data over that mechanism. The mechanism comes here as `form/`; the fields
-stay behind as a `.def`. The codec came first, as `form/codec.h`: the parse and the print for
-a decimal, an identifier and a run of bytes, with the spellings that are an application's own -
-a marker, the sizes a key is read as hex at - passed in rather than known. The number scale followed as
-`form/scale.h`: a row's presets and whether they measure or name, and the walk a choice row
-makes through a set. The field descriptor followed as `form/field.h`, which an
-application extends by embedding it first in a row of its own.
+Meshtastic fields are data over that mechanism. The mechanism is `form/`; the fields stay with
+the application as a `.def`.
+
+- `form/codec.h` parses and prints a decimal, an identifier and a run of bytes, with the
+  spellings that are an application's own - a marker, the sizes a key is read as hex at -
+  passed in rather than known.
+- `form/scale.h` is a number row's presets, whether they measure or name, and the walk a choice
+  row makes through a set.
+- `form/field.h` is one row of a form. An application extends it by embedding it as the first
+  member of a row of its own, and the form reads the table through a stride.
 
 ### 6. Persistence has two shapes
 
@@ -129,33 +132,15 @@ application extends by embedding it first in a row of its own.
   *widen by adding a key, never by adding a field*, *one key per group that can arrive on its
   own* - and those become this framework's schema rules, over inkwell's
   `base/record_file.h`.
-- **A journal**: an append-only log per subject, which is what `store_archive.c` (a
-  conversation's history past the in-memory ring) and `store_trends.c` (a node's readings past
-  one run) each built separately, and now share as `persist/journal.h`.
+- **A journal**: an append-only log per subject (`persist/journal.h`) - a history that outlives
+  an in-memory ring, or readings that outlive one run.
 
 Beside both sits a smaller thing, **a recently-used list** (`persist/recent.h`): the handful of
 things a program was last used with, newest first, bounded, and kept as one line of a settings
-file - the same move-to-front written twice over in mesh-client's preferences.
+file.
 
 Together they are roughly what `localStorage` and a small IndexedDB are to a web page, sized
 for an SD card.
-
-## What is new rather than moved
-
-These do not exist in mesh-client, and each is here because the decisions above make it cheap:
-
-- **Recording and replay.** Because update is pure, the last N actions can be kept in a ring and
-  written into inkwell's crash report beside where the reader was standing. Replaying them into
-  a fresh store reproduces the state that crashed.
-- **Selectors with generations.** mesh-client's `docs/ui.md` notes that anything holding a
-  snapshot rebuilds when any record in it changes. Each slice of state carries a generation
-  counter, and a selector - a filtered list, a row count - recomputes only when the generations
-  it read have moved. This is what `reselect` is to Redux.
-- **Lifecycle hooks.** Start, suspend, resume, quit. A handheld sleeps and wakes, and today each
-  application notices that on its own.
-- **A test harness for screens.** Given a state and a sequence of keys, assert the route, the
-  actions and - through inkcell's headless backend - the frame. mesh-client's `ui_capture`
-  scenes, with assertions.
 
 ## What inkstand is not
 
