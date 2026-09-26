@@ -10,9 +10,8 @@ runtime) and [inkcell](https://github.com/mcereal/inkcell) (the UI toolkit): sta
 forms, navigation and lifecycle, in the shape of Elm's architecture. C17, no threads, one loop.
 Five areas: `state/` and `persist/` are headless and link inkwell alone; `form/`, `nav/` and
 `app/` add inkcell. Arrows point down and `scripts/check-layers.py` holds them there. It is being
-extracted from [mesh-client](https://github.com/mcereal/mesh-client), and
-[`docs/extraction.md`](docs/extraction.md) is the running map of what comes next. `make test`
-before every push.
+extracted from [mesh-client](https://github.com/mcereal/mesh-client). `make test` before every
+push.
 
 ## Layout
 
@@ -25,7 +24,6 @@ tests/suites/<area>_*.c   one file per subject
 tests/support/            fixtures a second suite needed
 scripts/check-layers.py   the layering rule the compiler cannot see
 docs/architecture.md      why the areas are shaped the way they are
-docs/extraction.md        what comes over from mesh-client, in what order
 ```
 
 `include/inkstand/<area>/` is flat and is the interface. How a source is filed under
@@ -67,17 +65,26 @@ change. Find a header's source by *filename*, never by path.
   one is a decision about the shape of the stack.
 - **`#include <mesh/...>` is a build failure.** inkstand is below every application.
 
+## Docs
+
+The docs are reference: the README says what inkstand is and what is in it,
+`docs/architecture.md` why it is shaped the way it is, this file how to work in it, and each
+public header why its component works the way it does. **Planned work, open questions and
+roadmaps are tracked as issues, not written into the repository.** A doc describes what is true
+now; it is not a log of how it got that way. When a change makes `docs/architecture.md` wrong,
+the change fixes it.
+
 ## Extracting something from mesh-client
 
 The order and the method are inkwell's, because they worked there:
 
 1. **Check what it actually depends on.** `grep -h '#include "' <file>` over the source **and
-   its header**, then what the source *calls* across the line. `controller.c` includes four
-   mesh-client headers; the move is not ready until each is a seam.
+   its header**, then what the source *calls* across the line. The move is not ready until
+   every mesh-client header it reaches is a seam.
 2. **Make the seam in mesh-client first, in its own commit.** Change the component so it stops
    naming the application - a callback, a size, a table handed in - with mesh-client's tests
    still in place. Then move it in a commit that is only a move. A rename folded into a
-   relocation hid 26 wrong names in inkwell's MQTT extraction; do not repeat that.
+   relocation hides wrong names inside a diff nobody can read.
 3. **Move the tests with it.** A component that arrives without the cases that held it is a
    downgrade however clean the diff looks.
 4. **Rename on the way in.** `mesh_ui_*` becomes `inkstand_*`, and a name shaped by the

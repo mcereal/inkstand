@@ -31,7 +31,7 @@
  * first frame.
  *
  * The verb table is the half of this header not yet proven general: one application has written
- * rows for it. It is marked unstable until a second one does - see docs/extraction.md.
+ * rows for it. Treat it as unstable until a second one does.
  *
  * Nothing here exits. A verb that refuses returns inkstand_scene_fail(), the runner keeps the line
  * it was on, and the caller decides what a bad script costs - which is what lets a scene run
