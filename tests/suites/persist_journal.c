@@ -511,7 +511,12 @@ INKSTAND_TEST_CASE(journal_forget_all_reports_a_file_it_could_not_remove, unit) 
     snprintf(stuck, sizeof stuck, "%s/stuck.trend", fixture.dir);
     snprintf(inside, sizeof inside, "%s/keep", stuck);
     snprintf(other, sizeof other, "%s/other.trend", fixture.dir);
-    const bool staged = mkdir(stuck, 0700) == 0 && spill(inside, "x") && spill(other, "k=1\n");
+#ifdef _WIN32
+    const bool made = mkdir(stuck) == 0;
+#else
+    const bool made = mkdir(stuck, 0700) == 0;
+#endif
+    const bool staged = made && spill(inside, "x") && spill(other, "k=1\n");
 
     const int wiped = inkstand_journal_forget_all(&journal);
     const bool other_gone = !file_exists(other);

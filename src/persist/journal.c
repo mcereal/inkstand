@@ -144,7 +144,10 @@ int inkstand_journal_append(const struct inkstand_journal *journal, const char *
         return named;
     }
 
-    FILE *file = fopen(path, "a");
+    /* Keep record bytes and cap accounting identical across C runtimes. Text append on Windows
+
+     * expands each newline to CRLF, so the measured file crosses its cap early. */
+    FILE *file = fopen(path, "ab");
     if (file == NULL) {
         return -errno;
     }
