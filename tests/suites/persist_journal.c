@@ -79,7 +79,7 @@ static void fixture_close(struct journal_fixture *fixture) {
 
 /* The whole of a file, for comparing before with after. */
 static size_t slurp(const char *path, char *out, size_t capacity) {
-    FILE *file = fopen(path, "r");
+    FILE *file = fopen(path, "rb");
     if (file == NULL) {
         out[0] = '\0';
         return 0U;
@@ -91,7 +91,7 @@ static size_t slurp(const char *path, char *out, size_t capacity) {
 }
 
 static bool spill(const char *path, const char *text) {
-    FILE *file = fopen(path, "w");
+    FILE *file = fopen(path, "wb");
     if (file == NULL) {
         return false;
     }
@@ -429,6 +429,38 @@ INKSTAND_TEST_CASE(journal_filter_drops_what_it_is_asked_and_keeps_the_rest_verb
     INKSTAND_TEST_FAIL_IF(strcmp(body, "# kept\nk=a\\x3db\nk=last\n") != 0,
                           "the rest of the file did not come through verbatim, in order");
     INKSTAND_TEST_FAIL_IF(missing != 0, "a subject with no file had something dropped from it");
+    record_success(test_name);
+}
+
+INKSTAND_TEST_CASE(journal_filter_then_append_keeps_the_cap_in_record_bytes, unit) {
+    struct journal_fixture fixture;
+    INKSTAND_TEST_FAIL_IF(!fixture_open(&fixture), "could not make a temporary directory");
+    struct inkstand_journal journal;
+    INKSTAND_TEST_FAIL_IF(inkstand_journal_init(&journal, fixture.dir, ".log", 8U) != 0,
+                          "init failed");
+
+    struct append_probe first = {"k=1\n", false, false};
+    struct append_probe second = {"k=2\n", false, false};
+    struct append_probe third = {"k=3\n", false, false};
+    const int a = inkstand_journal_append(&journal, "s", probe_write, &first, NULL);
+    const int b = inkstand_journal_append(&journal, "s", probe_write, &second, NULL);
+    struct drop_filter filter = {.target = "k=1"};
+    char line[64];
+    const int dropped =
+        inkstand_journal_filter(&journal, "s", line, sizeof line, drop_line, drop_end, &filter);
+    bool over = true;
+    const int c = inkstand_journal_append(&journal, "s", probe_write, &third, &over);
+
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    (void)inkstand_journal_path(&journal, "s", path, sizeof path);
+    char body[32];
+    const size_t size = slurp(path, body, sizeof body);
+
+    fixture_close(&fixture);
+    INKSTAND_TEST_FAIL_IF(a != 0 || b != 0 || dropped != 1 || c != 0,
+                          "append, filter, or second append failed");
+    INKSTAND_TEST_FAIL_IF(over || size != 8U || strcmp(body, "k=2\nk=3\n") != 0,
+                          "a filter changed the record bytes or cap accounting");
     record_success(test_name);
 }
 
