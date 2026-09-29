@@ -17,8 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* The suffix a rewrite's temporary adds to the file it will replace. inkwell_record_replace()
-   spells it the same way, which is what lets a wipe find both kinds. */
+/* The suffix a rewrite's temporary adds to the file it will replace. */
 #define JOURNAL_TEMP_SUFFIX ".tmp"
 
 /* ---- names ---------------------------------------------------------------------------------- */
@@ -144,7 +143,10 @@ int inkstand_journal_append(const struct inkstand_journal *journal, const char *
         return named;
     }
 
-    FILE *file = fopen(path, "a");
+    /* Keep record bytes and cap accounting identical across C runtimes. Text append on Windows
+
+     * expands each newline to CRLF, so the measured file crosses its cap early. */
+    FILE *file = fopen(path, "ab");
     if (file == NULL) {
         return -errno;
     }
@@ -214,7 +216,26 @@ int inkstand_journal_replace(const struct inkstand_journal *journal, const char 
         return named;
     }
     char temp[INKSTAND_JOURNAL_PATH_MAX];
-    return inkwell_record_replace(path, temp, sizeof temp, write, context, false);
+    const int temp_named = snprintf(temp, sizeof temp, "%s" JOURNAL_TEMP_SUFFIX, path);
+    if (temp_named <= 0 || (size_t)temp_named >= sizeof temp) {
+        return -ENAMETOOLONG;
+    }
+    FILE *file = fopen(temp, "wb");
+    if (file == NULL) {
+        return -errno;
+    }
+    write(file, context);
+    int result = ferror(file) ? -EIO : 0;
+    if (fclose(file) != 0 && result == 0) {
+        result = -errno;
+    }
+    if (result == 0) {
+        result = inkwell_file_replace(temp, path);
+    }
+    if (result != 0) {
+        (void)remove(temp);
+    }
+    return result;
 }
 
 /* ---- filtering ------------------------------------------------------------------------------ */
@@ -262,7 +283,7 @@ int inkstand_journal_filter(const struct inkstand_journal *journal, const char *
         return named;
     }
 
-    FILE *source = fopen(path, "r");
+    FILE *source = fopen(path, "rb");
     if (source == NULL) {
         return (errno == ENOENT) ? 0 : -errno;
     }
@@ -272,7 +293,7 @@ int inkstand_journal_filter(const struct inkstand_journal *journal, const char *
         fclose(source);
         return -ENAMETOOLONG;
     }
-    FILE *out = fopen(temp, "w");
+    FILE *out = fopen(temp, "wb");
     if (out == NULL) {
         const int failed = -errno;
         fclose(source);

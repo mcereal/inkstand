@@ -25,15 +25,28 @@
 
 /* ---- fixtures ------------------------------------------------------------------------------- */
 
-/* A fresh directory under /tmp, and the journal's own directory one level inside it - so init has
-   a directory to make, which is the ordinary case. */
+/* A fresh directory under the host's temporary directory, and the journal's own directory one
+
+ * level inside it - so init has a directory to make, which is the ordinary case. */
 struct journal_fixture {
-    char root[64];
-    char dir[96];
+    char root[128];
+    char dir[160];
 };
 
 static bool fixture_open(struct journal_fixture *fixture) {
-    snprintf(fixture->root, sizeof fixture->root, "/tmp/inkstand_journal_XXXXXX");
+#ifdef _WIN32
+    const char *temp = getenv("TEMP");
+    if (temp == NULL || temp[0] == '\0') {
+        return false;
+    }
+#else
+    const char *temp = "/tmp";
+#endif
+    const int named =
+        snprintf(fixture->root, sizeof fixture->root, "%s/inkstand_journal_XXXXXX", temp);
+    if (named < 0 || (size_t)named >= sizeof fixture->root) {
+        return false;
+    }
     if (mkdtemp(fixture->root) == NULL) {
         return false;
     }
@@ -66,7 +79,7 @@ static void fixture_close(struct journal_fixture *fixture) {
 
 /* The whole of a file, for comparing before with after. */
 static size_t slurp(const char *path, char *out, size_t capacity) {
-    FILE *file = fopen(path, "r");
+    FILE *file = fopen(path, "rb");
     if (file == NULL) {
         out[0] = '\0';
         return 0U;
@@ -78,7 +91,7 @@ static size_t slurp(const char *path, char *out, size_t capacity) {
 }
 
 static bool spill(const char *path, const char *text) {
-    FILE *file = fopen(path, "w");
+    FILE *file = fopen(path, "wb");
     if (file == NULL) {
         return false;
     }
@@ -146,9 +159,9 @@ INKSTAND_TEST_CASE(journal_init_refuses_what_it_cannot_honour_and_stays_disabled
     INKSTAND_TEST_FAIL_IF(!fixture_open(&fixture), "could not make a temporary directory");
 
     struct inkstand_journal journal;
-    char nested[160];
+    char nested[192];
     snprintf(nested, sizeof nested, "%s/missing/journal", fixture.root);
-    char in_the_way[160];
+    char in_the_way[192];
     snprintf(in_the_way, sizeof in_the_way, "%s/a-file", fixture.root);
     INKSTAND_TEST_FAIL_IF(!spill(in_the_way, "not a directory"), "could not stage the file");
     char long_dir[INKSTAND_JOURNAL_DIR_MAX + 8U];
@@ -419,6 +432,38 @@ INKSTAND_TEST_CASE(journal_filter_drops_what_it_is_asked_and_keeps_the_rest_verb
     record_success(test_name);
 }
 
+INKSTAND_TEST_CASE(journal_filter_then_append_keeps_the_cap_in_record_bytes, unit) {
+    struct journal_fixture fixture;
+    INKSTAND_TEST_FAIL_IF(!fixture_open(&fixture), "could not make a temporary directory");
+    struct inkstand_journal journal;
+    INKSTAND_TEST_FAIL_IF(inkstand_journal_init(&journal, fixture.dir, ".log", 8U) != 0,
+                          "init failed");
+
+    struct append_probe first = {"k=1\n", false, false};
+    struct append_probe second = {"k=2\n", false, false};
+    struct append_probe third = {"k=3\n", false, false};
+    const int a = inkstand_journal_append(&journal, "s", probe_write, &first, NULL);
+    const int b = inkstand_journal_append(&journal, "s", probe_write, &second, NULL);
+    struct drop_filter filter = {.target = "k=1"};
+    char line[64];
+    const int dropped =
+        inkstand_journal_filter(&journal, "s", line, sizeof line, drop_line, drop_end, &filter);
+    bool over = true;
+    const int c = inkstand_journal_append(&journal, "s", probe_write, &third, &over);
+
+    char path[INKSTAND_JOURNAL_PATH_MAX];
+    (void)inkstand_journal_path(&journal, "s", path, sizeof path);
+    char body[32];
+    const size_t size = slurp(path, body, sizeof body);
+
+    fixture_close(&fixture);
+    INKSTAND_TEST_FAIL_IF(a != 0 || b != 0 || dropped != 1 || c != 0,
+                          "append, filter, or second append failed");
+    INKSTAND_TEST_FAIL_IF(over || size != 8U || strcmp(body, "k=2\nk=3\n") != 0,
+                          "a filter changed the record bytes or cap accounting");
+    record_success(test_name);
+}
+
 INKSTAND_TEST_CASE(journal_filter_that_drops_nothing_leaves_the_file_alone, unit) {
     struct journal_fixture fixture;
     INKSTAND_TEST_FAIL_IF(!fixture_open(&fixture), "could not make a temporary directory");
@@ -511,7 +556,12 @@ INKSTAND_TEST_CASE(journal_forget_all_reports_a_file_it_could_not_remove, unit) 
     snprintf(stuck, sizeof stuck, "%s/stuck.trend", fixture.dir);
     snprintf(inside, sizeof inside, "%s/keep", stuck);
     snprintf(other, sizeof other, "%s/other.trend", fixture.dir);
-    const bool staged = mkdir(stuck, 0700) == 0 && spill(inside, "x") && spill(other, "k=1\n");
+#ifdef _WIN32
+    const bool made = mkdir(stuck) == 0;
+#else
+    const bool made = mkdir(stuck, 0700) == 0;
+#endif
+    const bool staged = made && spill(inside, "x") && spill(other, "k=1\n");
 
     const int wiped = inkstand_journal_forget_all(&journal);
     const bool other_gone = !file_exists(other);

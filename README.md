@@ -47,6 +47,7 @@ together, and why, is [`docs/architecture.md`](docs/architecture.md).
 **`state/` and `persist/` are headless.** They link inkwell and nothing else, so a daemon, a
 bridge or a CLI can keep a store and a journal without a toolkit in its link line.
 `INKSTAND_WITH_UI=OFF` builds that half alone, and CI builds it that way on every pull request.
+CI also builds and runs the headless and UI unit suites on Windows UCRT64, with SDL disabled.
 
 ## The rules it is built on
 
