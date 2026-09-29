@@ -25,15 +25,28 @@
 
 /* ---- fixtures ------------------------------------------------------------------------------- */
 
-/* A fresh directory under /tmp, and the journal's own directory one level inside it - so init has
-   a directory to make, which is the ordinary case. */
+/* A fresh directory under the host's temporary directory, and the journal's own directory one
+
+ * level inside it - so init has a directory to make, which is the ordinary case. */
 struct journal_fixture {
-    char root[64];
-    char dir[96];
+    char root[128];
+    char dir[160];
 };
 
 static bool fixture_open(struct journal_fixture *fixture) {
-    snprintf(fixture->root, sizeof fixture->root, "/tmp/inkstand_journal_XXXXXX");
+#ifdef _WIN32
+    const char *temp = getenv("TEMP");
+    if (temp == NULL || temp[0] == '\0') {
+        return false;
+    }
+#else
+    const char *temp = "/tmp";
+#endif
+    const int named =
+        snprintf(fixture->root, sizeof fixture->root, "%s/inkstand_journal_XXXXXX", temp);
+    if (named < 0 || (size_t)named >= sizeof fixture->root) {
+        return false;
+    }
     if (mkdtemp(fixture->root) == NULL) {
         return false;
     }
@@ -146,9 +159,9 @@ INKSTAND_TEST_CASE(journal_init_refuses_what_it_cannot_honour_and_stays_disabled
     INKSTAND_TEST_FAIL_IF(!fixture_open(&fixture), "could not make a temporary directory");
 
     struct inkstand_journal journal;
-    char nested[160];
+    char nested[192];
     snprintf(nested, sizeof nested, "%s/missing/journal", fixture.root);
-    char in_the_way[160];
+    char in_the_way[192];
     snprintf(in_the_way, sizeof in_the_way, "%s/a-file", fixture.root);
     INKSTAND_TEST_FAIL_IF(!spill(in_the_way, "not a directory"), "could not stage the file");
     char long_dir[INKSTAND_JOURNAL_DIR_MAX + 8U];
