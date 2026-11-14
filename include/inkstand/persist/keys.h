@@ -48,8 +48,7 @@ struct inkstand_key {
  * loader used to carry a hand-counted length beside every prefix it matched, and a miscount
  * there is a key that silently never matches.
  */
-#define INKSTAND_KEY(literal, kind_)                                                               \
-    { (literal), sizeof(literal) - 1U, (kind_) }
+#define INKSTAND_KEY(literal, kind_) {(literal), sizeof(literal) - 1U, (kind_)}
 
 /* The rows, indexed by the caller's key. `count` includes the reserved row 0. */
 struct inkstand_key_table {

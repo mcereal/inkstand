@@ -32,7 +32,9 @@ change. Find a header's source by *filename*, never by path.
 
 ## Style
 
-- clang-format 18, config in `.clang-format`. `make format` before pushing; CI checks it.
+- clang-format, the exact version pinned in `requirements-dev.txt` (`make format` installs it into
+  `build/venv`; never format with whatever is on `PATH`), config in `.clang-format`. `make format`
+  before pushing; CI runs `make format-check`.
 - `inkstand_` on everything public, `INKSTAND_` on macros and enum members. A symbol carries the
   prefix of whoever owns it, so a name that came from mesh-client is renamed on the way in
   rather than keeping its old spelling: `mesh_ui_controller` is `inkstand_controller`.

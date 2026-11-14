@@ -137,9 +137,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format-18
-
-      # The file list is the Makefile's, so the exclusions are named once.
+      # The file list is the Makefile's, so the exclusions are named once, and so is the
+      # formatter: the clang-format requirements-dev.txt pins, from PyPI, the same wheel a Mac
+      # formats with. apt's clang-format-18 moved with the runner image's point release.
       - name: Check formatting
-        run: make format-check CLANG_FORMAT=clang-format-18
+        run: make format-check
