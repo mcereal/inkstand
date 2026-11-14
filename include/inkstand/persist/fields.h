@@ -75,13 +75,13 @@ struct inkstand_field {
  */
 #define INKSTAND_FIELD(ptr)                                                                        \
     ((struct inkstand_field){_Generic((ptr),                                                       \
-                             uint32_t *: INKSTAND_FIELD_TYPE_U32,                                  \
-                             uint16_t *: INKSTAND_FIELD_TYPE_U16,                                  \
-                             uint8_t *: INKSTAND_FIELD_TYPE_U8,                                    \
-                             int32_t *: INKSTAND_FIELD_TYPE_I32,                                   \
-                             int16_t *: INKSTAND_FIELD_TYPE_I16,                                   \
-                             bool *: INKSTAND_FIELD_TYPE_BOOL,                                     \
-                             float *: INKSTAND_FIELD_TYPE_F32),                                    \
+                                 uint32_t *: INKSTAND_FIELD_TYPE_U32,                              \
+                                 uint16_t *: INKSTAND_FIELD_TYPE_U16,                              \
+                                 uint8_t *: INKSTAND_FIELD_TYPE_U8,                                \
+                                 int32_t *: INKSTAND_FIELD_TYPE_I32,                               \
+                                 int16_t *: INKSTAND_FIELD_TYPE_I16,                               \
+                                 bool *: INKSTAND_FIELD_TYPE_BOOL,                                 \
+                                 float *: INKSTAND_FIELD_TYPE_F32),                                \
                              (ptr)})
 
 /*

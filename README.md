@@ -73,11 +73,12 @@ These are authoring rules - breaking one compiles and looks fine.
 git submodule update --init --recursive   # inkwell + inkcell; Mbed TLS nests under inkwell
 make test        # Debug build + ctest - the default verify step, and what CI runs
 make headless    # state/ and persist/ alone, with no inkcell configured
-make format      # clang-format all tracked .c/.h (needs clang-format 18)
+make format      # clang-format all tracked .c/.h, with the version requirements-dev.txt pins
 ```
 
-On macOS the Mbed TLS generator under inkwell wants a Python with `jinja2` and `jsonschema`;
-point CMake at one with `-DPython3_EXECUTABLE=...` if the one on `PATH` does not have them.
+The Mbed TLS generator under inkwell wants a Python with `jinja2` and `jsonschema`. `make` builds
+one into `build/venv` from `requirements-dev.txt` and points CMake at it; a plain `cmake` configure
+needs `-DPython3_EXECUTABLE=...` naming such a Python if the one on `PATH` does not have them.
 
 Sanitizers: `cmake -S . -B build -DINKSTAND_ENABLE_ASAN=ON -DINKSTAND_ENABLE_UBSAN=ON`.
 
